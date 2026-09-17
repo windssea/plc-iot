@@ -1,0 +1,6 @@
+{
+  "gatewayId": "PLC-01",
+  "dataDirectory": "../.local/agent",
+  "operationTimeoutSeconds": 5,
+  "queueCapacity": 8
+}

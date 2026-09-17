@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "gatewayId": "PLC-01",
+  "timestamp": null,
+  "sessionId": "session-001",
+  "online": false,
+  "reason": "connection_lost"
+}

@@ -1,0 +1,86 @@
+{
+  "prefix": "iot/v1/gateway/{gatewayId}",
+  "topics": [
+    {
+      "kind": "configSet",
+      "suffix": "config/set",
+      "direction": "to_agent",
+      "qos": 1,
+      "retain": true,
+      "maxPayloadBytes": 2097152,
+      "schema": "protocol.schema.json#/$defs/configSet"
+    },
+    {
+      "kind": "configAck",
+      "suffix": "config/ack",
+      "direction": "from_agent",
+      "qos": 1,
+      "retain": false,
+      "maxPayloadBytes": 131072,
+      "schema": "protocol.schema.json#/$defs/configAck"
+    },
+    {
+      "kind": "configGet",
+      "suffix": "config/get",
+      "direction": "from_agent",
+      "qos": 1,
+      "retain": false,
+      "maxPayloadBytes": 131072,
+      "schema": "protocol.schema.json#/$defs/configGet"
+    },
+    {
+      "kind": "data",
+      "suffix": "data",
+      "direction": "from_agent",
+      "qos": 1,
+      "retain": false,
+      "maxPayloadBytes": 131072,
+      "schema": "protocol.schema.json#/$defs/data"
+    },
+    {
+      "kind": "dataAck",
+      "suffix": "data/ack",
+      "direction": "to_agent",
+      "qos": 1,
+      "retain": false,
+      "maxPayloadBytes": 131072,
+      "schema": "protocol.schema.json#/$defs/dataAck"
+    },
+    {
+      "kind": "status",
+      "suffix": "status",
+      "direction": "from_agent",
+      "qos": 1,
+      "retain": true,
+      "maxPayloadBytes": 131072,
+      "schema": "protocol.schema.json#/$defs/status"
+    },
+    {
+      "kind": "heartbeat",
+      "suffix": "heartbeat",
+      "direction": "from_agent",
+      "qos": 1,
+      "retain": false,
+      "maxPayloadBytes": 131072,
+      "schema": "protocol.schema.json#/$defs/heartbeat"
+    },
+    {
+      "kind": "deviceStatus",
+      "suffix": "device/status",
+      "direction": "from_agent",
+      "qos": 1,
+      "retain": false,
+      "maxPayloadBytes": 131072,
+      "schema": "protocol.schema.json#/$defs/deviceStatus"
+    },
+    {
+      "kind": "event",
+      "suffix": "event",
+      "direction": "from_agent",
+      "qos": 1,
+      "retain": false,
+      "maxPayloadBytes": 131072,
+      "schema": "protocol.schema.json#/$defs/event"
+    }
+  ]
+}

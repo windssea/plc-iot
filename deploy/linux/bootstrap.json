@@ -1,0 +1,6 @@
+{
+  "gatewayId": "REPLACE-PLC-ID",
+  "dataDirectory": "/var/lib/plcnext-iot",
+  "operationTimeoutSeconds": 5,
+  "queueCapacity": 8
+}

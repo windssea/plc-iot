@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "gatewayId": "PLC-01",
+  "timestamp": 1788748123123,
+  "messageId": "cfg-PLC-01-11",
+  "configVersion": 11,
+  "config": {
+    "enabled": true,
+    "report": {
+      "batchIntervalMs": 1000,
+      "maxBatchPoints": 500
+    },
+    "devices": [
+      {
+        "deviceId": "power-meter-01",
+        "name": "1#进线电能表",
+        "enabled": true,
+        "protocol": "modbus_tcp",
+        "connection": {
+          "host": "192.168.10.101",
+          "port": 502,
+          "unitId": 1,
+          "connectTimeoutMs": 3000,
+          "requestTimeoutMs": 1000,
+          "retryCount": 2
+        },
+        "points": [
+          {
+            "pointId": "voltage_a",
+            "name": "A相电压",
+            "enabled": true,
+            "dataType": "uint16",
+            "pollIntervalMs": 1000,
+            "scale": 0.1,
+            "offset": 0,
+            "unit": "V",
+            "reportMode": "change_or_cyclic",
+            "reportIntervalMs": 5000,
+            "deadband": 0.5,
+            "staleAfterMs": 5000,
+            "modbus": {
+              "area": "holding_register",
+              "address": 0,
+              "byteOrder": "AB"
+            }
+          },
+          {
+            "pointId": "current_a",
+            "name": "A相电流",
+            "enabled": true,
+            "dataType": "uint16",
+            "pollIntervalMs": 1000,
+            "scale": 0.01,
+            "offset": 0,
+            "unit": "A",
+            "reportMode": "change_or_cyclic",
+            "reportIntervalMs": 5000,
+            "deadband": 0.05,
+            "staleAfterMs": 5000,
+            "modbus": {
+              "area": "holding_register",
+              "address": 1,
+              "byteOrder": "AB"
+            }
+          },
+          {
+            "pointId": "active_power",
+            "name": "有功功率",
+            "enabled": true,
+            "dataType": "int32",
+            "pollIntervalMs": 2000,
+            "scale": 0.001,
+            "offset": 0,
+            "unit": "kW",
+            "reportMode": "change_or_cyclic",
+            "reportIntervalMs": 10000,
+            "deadband": 0.01,
+            "staleAfterMs": 10000,
+            "modbus": {
+              "area": "holding_register",
+              "address": 2,
+              "byteOrder": "ABCD"
+            }
+          },
+          {
+            "pointId": "energy_total",
+            "name": "正向有功电能",
+            "enabled": true,
+            "dataType": "uint32",
+            "pollIntervalMs": 10000,
+            "scale": 0.01,
+            "offset": 0,
+            "unit": "kWh",
+            "reportMode": "cyclic",
+            "reportIntervalMs": 60000,
+            "deadband": 0,
+            "staleAfterMs": 30000,
+            "modbus": {
+              "area": "holding_register",
+              "address": 4,
+              "byteOrder": "CDAB"
+            }
+          },
+          {
+            "pointId": "breaker_closed",
+            "name": "断路器合位",
+            "enabled": true,
+            "dataType": "bool",
+            "pollIntervalMs": 500,
+            "scale": 1,
+            "offset": 0,
+            "reportMode": "change",
+            "reportIntervalMs": 1000,
+            "deadband": 0,
+            "staleAfterMs": 2000,
+            "modbus": {
+              "area": "coil",
+              "address": 0
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

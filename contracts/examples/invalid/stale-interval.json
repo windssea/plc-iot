@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "gatewayId": "PLC-01",
+  "timestamp": 1788748123123,
+  "messageId": "cfg-PLC-01-10",
+  "configVersion": 10,
+  "config": {
+    "enabled": true,
+    "report": {
+      "batchIntervalMs": 1000,
+      "maxBatchPoints": 500
+    },
+    "devices": [
+      {
+        "deviceId": "meter-A",
+        "name": "Meter A",
+        "enabled": true,
+        "protocol": "modbus_tcp",
+        "connection": {
+          "host": "192.168.10.101",
+          "port": 502,
+          "unitId": 1,
+          "connectTimeoutMs": 3000,
+          "requestTimeoutMs": 1000,
+          "retryCount": 0
+        },
+        "points": [
+          {
+            "pointId": "voltage",
+            "name": "Voltage",
+            "enabled": true,
+            "dataType": "uint16",
+            "pollIntervalMs": 1000,
+            "scale": 0.1,
+            "offset": 0,
+            "unit": "V",
+            "reportMode": "change_or_cyclic",
+            "reportIntervalMs": 5000,
+            "deadband": 0.1,
+            "staleAfterMs": 999,
+            "modbus": {
+              "area": "holding_register",
+              "address": 0,
+              "byteOrder": "AB"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "axcf2152": {
+    "target": "AXC F 2152",
+    "platform": "linux/arm/v7",
+    "archive": "plcnext-iot-armv7.tar",
+    "architecture": "arm",
+    "elfMachine": 40,
+    "developmentAppId": "90260909002152"
+  },
+  "vplc": {
+    "target": "VPLCNEXT CONTROL 500,VPLCNEXT CONTROL 1000,VPLCNEXT CONTROL 2000,VPLCNEXT CONTROL 3000",
+    "platform": "linux/amd64",
+    "archive": "plcnext-iot-amd64.tar",
+    "architecture": "amd64",
+    "elfMachine": 62,
+    "developmentAppId": "90260909001000"
+  }
+}

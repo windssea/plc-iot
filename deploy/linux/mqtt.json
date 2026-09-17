@@ -1,0 +1,8 @@
+{
+  "host": "broker.example.invalid",
+  "port": 8883,
+  "tls": true,
+  "username": "REPLACE-USERNAME",
+  "passwordEnv": "IOT_MQTT_PASSWORD",
+  "keepalive": 30
+}

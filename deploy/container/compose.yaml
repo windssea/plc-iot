@@ -1,0 +1,21 @@
+services:
+  iot:
+    image: ${IOT_IMAGE:-plcnext-iot:0.2.0-amd64}
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 30m
+    ports:
+      - '8080:8080'
+    volumes:
+      - iot-data:/var/lib/plcnext-iot
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+volumes:
+  iot-data:

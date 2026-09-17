@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "gatewayId": "PLC-01",
+  "timestamp": 1788748123123,
+  "sessionId": "session-001",
+  "bootId": "boot-001",
+  "agentVersion": "0.1.0",
+  "activeConfigVersion": 10,
+  "uptimeSeconds": 60,
+  "agentState": "RUNNING",
+  "devices": [
+    {
+      "deviceId": "meter-A",
+      "status": "ONLINE",
+      "lastError": null,
+      "lastGoodTimestamp": 1788748123000
+    }
+  ],
+  "points": {
+    "total": 1,
+    "good": 1,
+    "bad": 0
+  },
+  "queue": {
+    "batches": 0,
+    "payloadBytes": 0,
+    "droppedBatches": 0
+  }
+}

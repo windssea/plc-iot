@@ -1,0 +1,1181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PLC child-device IoT wire protocol v1",
+  "$comment": "Validate through a named $defs entry selected by topics.json. No network references.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/configSet"
+    },
+    {
+      "$ref": "#/$defs/configAck"
+    },
+    {
+      "$ref": "#/$defs/configGet"
+    },
+    {
+      "$ref": "#/$defs/data"
+    },
+    {
+      "$ref": "#/$defs/dataAck"
+    },
+    {
+      "$ref": "#/$defs/status"
+    },
+    {
+      "$ref": "#/$defs/heartbeat"
+    },
+    {
+      "$ref": "#/$defs/deviceStatus"
+    },
+    {
+      "$ref": "#/$defs/event"
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?![\\s\\S])"
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "path",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "enum": [
+            "SCHEMA_INVALID",
+            "INVALID_JSON",
+            "PAYLOAD_TOO_LARGE",
+            "GATEWAY_MISMATCH",
+            "DUPLICATE_DEVICE_ID",
+            "DUPLICATE_POINT_ID",
+            "INVALID_ADDRESS",
+            "INVALID_STALE_INTERVAL",
+            "POINT_LIMIT_EXCEEDED",
+            "VERSION_CONFLICT",
+            "STALE_VERSION",
+            "RESOURCE_LIMIT",
+            "STORAGE_ERROR",
+            "APPLY_FAILED",
+            "UNKNOWN_CONFIG_VERSION",
+            "UNKNOWN_DEVICE",
+            "UNKNOWN_POINT",
+            "EXPIRED_DATA",
+            "INVALID_TIMESTAMP",
+            "DUPLICATE_VALUE"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "maxLength": 512,
+          "pattern": "^(|/.*)$"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "deviceId": {
+          "$ref": "#/$defs/id"
+        },
+        "pointId": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "modbus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "area",
+        "address"
+      ],
+      "properties": {
+        "area": {
+          "enum": [
+            "coil",
+            "discrete_input",
+            "holding_register",
+            "input_register"
+          ]
+        },
+        "address": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "byteOrder": {
+          "enum": [
+            "AB",
+            "BA",
+            "ABCD",
+            "BADC",
+            "CDAB",
+            "DCBA"
+          ]
+        }
+      }
+    },
+    "connection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "host",
+        "port",
+        "unitId",
+        "connectTimeoutMs",
+        "requestTimeoutMs",
+        "retryCount"
+      ],
+      "properties": {
+        "host": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9.:-]*(?![\\s\\S])"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "unitId": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "connectTimeoutMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300000
+        },
+        "requestTimeoutMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300000
+        },
+        "retryCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        }
+      }
+    },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pointId",
+        "name",
+        "enabled",
+        "dataType",
+        "pollIntervalMs",
+        "scale",
+        "offset",
+        "reportMode",
+        "reportIntervalMs",
+        "deadband",
+        "staleAfterMs",
+        "modbus"
+      ],
+      "properties": {
+        "pointId": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "dataType": {
+          "enum": [
+            "bool",
+            "int16",
+            "uint16",
+            "int32",
+            "uint32",
+            "float32"
+          ]
+        },
+        "pollIntervalMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400000
+        },
+        "scale": {
+          "type": "number"
+        },
+        "offset": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "reportMode": {
+          "enum": [
+            "cyclic",
+            "change",
+            "change_or_cyclic"
+          ]
+        },
+        "reportIntervalMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400000
+        },
+        "deadband": {
+          "type": "number",
+          "minimum": 0
+        },
+        "staleAfterMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400000
+        },
+        "modbus": {
+          "$ref": "#/$defs/modbus"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "dataType": {
+                "const": "bool"
+              }
+            },
+            "required": [
+              "dataType"
+            ]
+          },
+          "then": {
+            "properties": {
+              "scale": {
+                "const": 1
+              },
+              "offset": {
+                "const": 0
+              },
+              "deadband": {
+                "const": 0
+              },
+              "modbus": {
+                "properties": {
+                  "area": {
+                    "enum": [
+                      "coil",
+                      "discrete_input"
+                    ]
+                  }
+                },
+                "not": {
+                  "required": [
+                    "byteOrder"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "dataType": {
+                "enum": [
+                  "int16",
+                  "uint16"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "modbus": {
+                "required": [
+                  "byteOrder"
+                ],
+                "properties": {
+                  "area": {
+                    "enum": [
+                      "holding_register",
+                      "input_register"
+                    ]
+                  },
+                  "byteOrder": {
+                    "enum": [
+                      "AB",
+                      "BA"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "dataType": {
+                "enum": [
+                  "int32",
+                  "uint32",
+                  "float32"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "modbus": {
+                "required": [
+                  "byteOrder"
+                ],
+                "properties": {
+                  "area": {
+                    "enum": [
+                      "holding_register",
+                      "input_register"
+                    ]
+                  },
+                  "byteOrder": {
+                    "enum": [
+                      "ABCD",
+                      "BADC",
+                      "CDAB",
+                      "DCBA"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "device": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deviceId",
+        "name",
+        "enabled",
+        "protocol",
+        "connection",
+        "points"
+      ],
+      "properties": {
+        "deviceId": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "protocol": {
+          "const": "modbus_tcp"
+        },
+        "connection": {
+          "$ref": "#/$defs/connection"
+        },
+        "points": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/point"
+          },
+          "maxItems": 2000,
+          "minItems": 0
+        }
+      }
+    },
+    "configSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "gatewayId",
+        "timestamp",
+        "messageId",
+        "configVersion",
+        "config"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "gatewayId": {
+          "$ref": "#/$defs/id"
+        },
+        "timestamp": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "messageId": {
+          "$ref": "#/$defs/id"
+        },
+        "configVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "config": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "report",
+            "devices"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "report": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "batchIntervalMs",
+                "maxBatchPoints"
+              ],
+              "properties": {
+                "batchIntervalMs": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 86400000
+                },
+                "maxBatchPoints": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 500
+                }
+              }
+            },
+            "devices": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/device"
+              },
+              "maxItems": 50,
+              "minItems": 0
+            }
+          }
+        }
+      }
+    },
+    "configAck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "gatewayId",
+        "timestamp",
+        "messageId",
+        "configVersion",
+        "activeConfigVersion",
+        "status",
+        "errors"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "gatewayId": {
+          "$ref": "#/$defs/id"
+        },
+        "timestamp": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "messageId": {
+          "$ref": "#/$defs/id"
+        },
+        "configVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "activeConfigVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "status": {
+          "enum": [
+            "APPLIED",
+            "REJECTED",
+            "FAILED"
+          ]
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/error"
+          },
+          "maxItems": 32,
+          "minItems": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "APPLIED"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "errors": {
+                "maxItems": 0
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "errors": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "configGet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "gatewayId",
+        "timestamp",
+        "messageId",
+        "activeConfigVersion",
+        "sessionId"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "gatewayId": {
+          "$ref": "#/$defs/id"
+        },
+        "timestamp": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "messageId": {
+          "$ref": "#/$defs/id"
+        },
+        "activeConfigVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "sessionId": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "value": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deviceId",
+        "pointId",
+        "value",
+        "quality",
+        "timestamp"
+      ],
+      "properties": {
+        "deviceId": {
+          "$ref": "#/$defs/id"
+        },
+        "pointId": {
+          "$ref": "#/$defs/id"
+        },
+        "value": {
+          "type": [
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "quality": {
+          "enum": [
+            "GOOD",
+            "BAD_TIMEOUT",
+            "BAD_CONNECTION",
+            "BAD_PROTOCOL",
+            "BAD_DECODE",
+            "BAD_CONFIGURATION",
+            "STALE",
+            "UNKNOWN"
+          ]
+        },
+        "timestamp": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "sourceTimestamp": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "quality": {
+                "const": "GOOD"
+              }
+            },
+            "required": [
+              "quality"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": [
+                  "number",
+                  "boolean"
+                ]
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "gatewayId",
+        "timestamp",
+        "messageId",
+        "bootId",
+        "sequence",
+        "configVersion",
+        "values"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "gatewayId": {
+          "$ref": "#/$defs/id"
+        },
+        "timestamp": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "messageId": {
+          "$ref": "#/$defs/id"
+        },
+        "bootId": {
+          "$ref": "#/$defs/id"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "configVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/value"
+          },
+          "maxItems": 500,
+          "minItems": 1
+        }
+      }
+    },
+    "dataAck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "gatewayId",
+        "timestamp",
+        "messageId",
+        "status",
+        "errors"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "gatewayId": {
+          "$ref": "#/$defs/id"
+        },
+        "timestamp": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "messageId": {
+          "$ref": "#/$defs/id"
+        },
+        "status": {
+          "enum": [
+            "STORED",
+            "REJECTED"
+          ]
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/error"
+          },
+          "maxItems": 32,
+          "minItems": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "STORED"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "errors": {
+                "maxItems": 0
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "errors": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "gatewayId",
+        "timestamp",
+        "sessionId",
+        "online",
+        "reason"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "gatewayId": {
+          "$ref": "#/$defs/id"
+        },
+        "timestamp": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sessionId": {
+          "$ref": "#/$defs/id"
+        },
+        "online": {
+          "type": "boolean"
+        },
+        "reason": {
+          "enum": [
+            "connected",
+            "shutdown",
+            "connection_lost"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "reason": {
+                "const": "connection_lost"
+              }
+            },
+            "required": [
+              "reason"
+            ]
+          },
+          "then": {
+            "properties": {
+              "timestamp": {
+                "type": "null"
+              },
+              "online": {
+                "const": false
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "timestamp": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "reason": {
+                "const": "connected"
+              }
+            },
+            "required": [
+              "reason"
+            ]
+          },
+          "then": {
+            "properties": {
+              "online": {
+                "const": true
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "online": {
+                "const": false
+              }
+            }
+          }
+        }
+      ]
+    },
+    "deviceState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deviceId",
+        "status",
+        "lastError",
+        "lastGoodTimestamp"
+      ],
+      "properties": {
+        "deviceId": {
+          "$ref": "#/$defs/id"
+        },
+        "status": {
+          "enum": [
+            "DISABLED",
+            "CONNECTING",
+            "ONLINE",
+            "DEGRADED",
+            "OFFLINE"
+          ]
+        },
+        "lastError": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          ]
+        },
+        "lastGoodTimestamp": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "deviceStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "gatewayId",
+        "timestamp",
+        "sessionId",
+        "configVersion",
+        "device"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "gatewayId": {
+          "$ref": "#/$defs/id"
+        },
+        "timestamp": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "sessionId": {
+          "$ref": "#/$defs/id"
+        },
+        "configVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "device": {
+          "$ref": "#/$defs/deviceState"
+        }
+      }
+    },
+    "heartbeat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "gatewayId",
+        "timestamp",
+        "sessionId",
+        "bootId",
+        "agentVersion",
+        "activeConfigVersion",
+        "uptimeSeconds",
+        "agentState",
+        "devices",
+        "points",
+        "queue"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "gatewayId": {
+          "$ref": "#/$defs/id"
+        },
+        "timestamp": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "sessionId": {
+          "$ref": "#/$defs/id"
+        },
+        "bootId": {
+          "$ref": "#/$defs/id"
+        },
+        "agentVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "activeConfigVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "uptimeSeconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "agentState": {
+          "enum": [
+            "WAITING_CONFIG",
+            "RUNNING",
+            "DISABLED"
+          ]
+        },
+        "devices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/deviceState"
+          },
+          "maxItems": 50,
+          "minItems": 0
+        },
+        "points": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "total",
+            "good",
+            "bad"
+          ],
+          "properties": {
+            "total": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2000
+            },
+            "good": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2000
+            },
+            "bad": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2000
+            }
+          }
+        },
+        "queue": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "batches",
+            "payloadBytes",
+            "droppedBatches"
+          ],
+          "properties": {
+            "batches": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "payloadBytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "droppedBatches": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "gatewayId",
+        "timestamp",
+        "messageId",
+        "sessionId",
+        "activeConfigVersion",
+        "level",
+        "code",
+        "message"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "gatewayId": {
+          "$ref": "#/$defs/id"
+        },
+        "timestamp": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "messageId": {
+          "$ref": "#/$defs/id"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/id"
+        },
+        "activeConfigVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "level": {
+          "enum": [
+            "INFO",
+            "WARNING",
+            "ERROR"
+          ]
+        },
+        "code": {
+          "enum": [
+            "CONFIG_REJECTED",
+            "CONFIG_APPLY_FAILED",
+            "DATA_DROPPED",
+            "STORAGE_ERROR",
+            "DATA_REJECTED",
+            "CLOCK_SKEW",
+            "RESOURCE_LIMIT"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "deviceId": {
+          "$ref": "#/$defs/id"
+        },
+        "pointId": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>PLCnext IoT · 初始化</title><link rel="stylesheet" href="/style.css"><script defer src="/app.js"></script></head>
+<body><header><strong>PLCnext <span>IoT</span></strong><span>设备初始化</span></header>
+<main><aside><p class="eyebrow">现场配置</p><h1>连接这台 PLC</h1><p>完成一次设置，采集服务即可自动启动。设备重启后，无需重复配置。</p><ol><li><b>确认设备身份</b><small>使用平台中已有的 PLC ID</small></li><li><b>连接 IoT 平台</b><small>填写 MQTT Broker 与访问凭据</small></li><li><b>接收采集配置</b><small>子设备与点位配置由平台下发</small></li></ol><p class="footnote">初始化请在可信管理网络或 HTTPS 连接下进行。</p></aside>
+<section><div id="loading" role="status">正在读取设备状态…</div>
+<div id="summary" hidden><span class="badge">已完成初始化</span><h2>当前配置</h2><dl id="facts"></dl><p id="state" role="status" aria-live="polite"></p><div class="actions"><button id="edit" type="button" class="primary">修改设置</button></div><small>PLC ID 与设备上的采集数据库绑定，不能通过此页面修改。修改平台连接会短暂中断采集与平台上报。</small></div>
+<form id="setup" hidden><h2>设备与平台</h2><label for="gatewayId">PLC ID</label><input id="gatewayId" name="gatewayId" required maxlength="64" pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,63}" placeholder="例如 PLC-01" autocomplete="off"><small id="identityNote" hidden>PLC ID 不可修改。</small><small id="identityHint">必须与平台中的 PLC 标识一致，保存后不能通过此页面修改。</small>
+<div class="row"><div><label for="host">Broker 地址</label><input id="host" name="host" required maxlength="253" placeholder="mqtt.example.com" autocomplete="off"></div><div><label for="port">端口</label><input id="port" name="port" type="number" min="1" max="65535" required value="8883"></div></div>
+<label class="check"><input id="tls" name="tls" type="checkbox" checked>使用 TLS 加密连接</label>
+<div class="row equal"><div><label for="username">用户名</label><input id="username" name="username" maxlength="256" autocomplete="off"></div><div><label for="password">密码</label><input id="password" name="password" type="password" maxlength="4096" autocomplete="new-password"></div></div>
+<small id="passwordHint">仅当 Broker 允许匿名连接时，用户名和密码同时留空。</small><small id="passwordNote" hidden>留空表示沿用已保存的密码；要改为匿名连接，请同时清空用户名。</small>
+<details><summary>私有 CA 证书（可选）</summary><label for="caPem">PEM 格式 CA 证书</label><textarea id="caPem" name="caPem" rows="5" maxlength="16384" placeholder="-----BEGIN CERTIFICATE-----"></textarea><small id="caHint">使用公共可信证书时无需填写。</small><label class="check" id="removecaRow" hidden><input id="removeca" type="checkbox">移除已保存的私有 CA</label></details>
+<p id="notice" role="status" aria-live="polite"></p><div class="actions"><button id="test" type="button">测试连接</button><button id="save" type="submit" class="primary">保存并启动</button><button id="cancel" type="button" hidden>取消修改</button></div>
+<div id="confirm" hidden><p id="confirmText"></p><div class="actions"><button id="confirmYes" type="button" class="primary">确认修改</button><button id="confirmNo" type="button">返回检查</button></div></div>
+<small>支持先保存、稍后联网。凭据仅保存在当前设备，不会回显。</small></form></section></main>
+<footer>PLC 子设备采集服务 <span>本地设置 · 自动恢复</span></footer></body></html>

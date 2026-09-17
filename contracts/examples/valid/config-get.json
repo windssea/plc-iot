@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "gatewayId": "PLC-01",
+  "timestamp": 1788748123123,
+  "messageId": "get-001",
+  "activeConfigVersion": 0,
+  "sessionId": "session-001"
+}

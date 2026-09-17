@@ -1,0 +1,32 @@
+[Unit]
+Description=PLCnext child-device IoT collector
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=plcnext-iot
+Group=plcnext-iot
+WorkingDirectory=/opt/plcnext-iot/current
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+EnvironmentFile=-/etc/plcnext-iot/agent.env
+ExecStartPre=/opt/plcnext-iot/current/.venv/bin/python -m tools.preflight --bootstrap /etc/plcnext-iot/bootstrap.json --mqtt /etc/plcnext-iot/mqtt.json --release-root /opt/plcnext-iot/current
+ExecStart=/opt/plcnext-iot/current/.venv/bin/python -m tools.agent --bootstrap /etc/plcnext-iot/bootstrap.json --mqtt /etc/plcnext-iot/mqtt.json --driver modbus-tcp --quiet-samples
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=1800
+KillSignal=SIGTERM
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/plcnext-iot
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

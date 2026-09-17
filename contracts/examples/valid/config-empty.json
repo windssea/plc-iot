@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "gatewayId": "PLC-01",
+  "timestamp": 1788748123123,
+  "messageId": "cfg-PLC-01-10",
+  "configVersion": 10,
+  "config": {
+    "enabled": true,
+    "report": {
+      "batchIntervalMs": 1000,
+      "maxBatchPoints": 500
+    },
+    "devices": []
+  }
+}

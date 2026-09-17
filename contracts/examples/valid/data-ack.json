@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "gatewayId": "PLC-01",
+  "timestamp": 1788748123123,
+  "messageId": "batch-001",
+  "status": "STORED",
+  "errors": []
+}

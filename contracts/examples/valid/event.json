@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "gatewayId": "PLC-01",
+  "timestamp": 1788748123123,
+  "messageId": "event-001",
+  "sessionId": "session-001",
+  "activeConfigVersion": 10,
+  "level": "WARNING",
+  "code": "DATA_DROPPED",
+  "message": "Oldest batch dropped due to queue capacity."
+}

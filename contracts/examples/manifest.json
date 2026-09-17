@@ -1,0 +1,114 @@
+[
+  {
+    "file": "valid/config-set.json",
+    "kind": "configSet",
+    "valid": true
+  },
+  {
+    "file": "valid/config-ack.json",
+    "kind": "configAck",
+    "valid": true
+  },
+  {
+    "file": "valid/config-get.json",
+    "kind": "configGet",
+    "valid": true
+  },
+  {
+    "file": "valid/data.json",
+    "kind": "data",
+    "valid": true
+  },
+  {
+    "file": "valid/data-ack.json",
+    "kind": "dataAck",
+    "valid": true
+  },
+  {
+    "file": "valid/status-online.json",
+    "kind": "status",
+    "valid": true
+  },
+  {
+    "file": "valid/status-lwt.json",
+    "kind": "status",
+    "valid": true
+  },
+  {
+    "file": "valid/device-status.json",
+    "kind": "deviceStatus",
+    "valid": true
+  },
+  {
+    "file": "valid/heartbeat.json",
+    "kind": "heartbeat",
+    "valid": true
+  },
+  {
+    "file": "valid/event.json",
+    "kind": "event",
+    "valid": true
+  },
+  {
+    "file": "valid/config-empty.json",
+    "kind": "configSet",
+    "valid": true
+  },
+  {
+    "file": "valid/config-bool.json",
+    "kind": "configSet",
+    "valid": true
+  },
+  {
+    "file": "valid/data-bad-quality.json",
+    "kind": "data",
+    "valid": true
+  },
+  {
+    "file": "valid/config-rejected.json",
+    "kind": "configAck",
+    "valid": true
+  },
+  {
+    "file": "invalid/unknown-field.json",
+    "kind": "configSet",
+    "valid": false,
+    "code": "SCHEMA_INVALID"
+  },
+  {
+    "file": "invalid/duplicate-device.json",
+    "kind": "configSet",
+    "valid": false,
+    "code": "DUPLICATE_DEVICE_ID"
+  },
+  {
+    "file": "invalid/duplicate-point.json",
+    "kind": "configSet",
+    "valid": false,
+    "code": "DUPLICATE_POINT_ID"
+  },
+  {
+    "file": "invalid/address-overflow.json",
+    "kind": "configSet",
+    "valid": false,
+    "code": "INVALID_ADDRESS"
+  },
+  {
+    "file": "invalid/stale-interval.json",
+    "kind": "configSet",
+    "valid": false,
+    "code": "INVALID_STALE_INTERVAL"
+  },
+  {
+    "file": "invalid/unsupported-protocol.json",
+    "kind": "configSet",
+    "valid": false,
+    "code": "SCHEMA_INVALID"
+  },
+  {
+    "file": "invalid/topic-injection.json",
+    "kind": "configSet",
+    "valid": false,
+    "code": "SCHEMA_INVALID"
+  }
+]
