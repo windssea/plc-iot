@@ -23,12 +23,24 @@ def validate_version(version):
         raise ValueError('Version must be major.minor.patch with components 0..255')
 
 
+def firmware_tuple(value):
+    if not re.fullmatch(r'\d+\.\d+\.\d+', value):
+        raise ValueError('Firmware must be major.minor.patch')
+    major, minor, patch = (int(part) for part in value.split('.'))
+    # WBM shows "2025.6.0 (25.6.0.41)"; AppManager compares the short 25.x form.
+    if major >= 2000:
+        major -= 2000
+    return major, minor, patch
+
+
 def metadata(profile, identifier, version, image_id, image_name, port, minimum):
     validate_version(version)
     if not re.fullmatch(r'\d{14}', identifier):
         raise ValueError('App identifier must contain exactly 14 digits')
-    if not re.fullmatch(r'\d+\.\d+\.\d+', minimum) or tuple(map(int,minimum.split('.'))) < (2025,0,0):
-        raise ValueError('OCI App-part requires firmware 2025.0.0 or newer')
+    parsed = firmware_tuple(minimum)
+    if parsed < (25, 0, 0):
+        raise ValueError('OCI App-part requires firmware 25.0.0 / 2025.0.0 or newer')
+    minimum = f'{parsed[0]}.{parsed[1]}.{parsed[2]}'
     if type(port) is not int or not 1024 <= port <= 65535:
         raise ValueError('Rootless web port must be 1024..65535')
     return dict(plcnextapp=dict(name='PLCnext IoT', identifier=identifier, version=version,
@@ -72,7 +84,7 @@ WantedBy=default.target
 '''
 
 
-def stage(profile, image, destination, identifier, version, port=8080, minimum='2026.0.3'):
+def stage(profile, image, destination, identifier, version, port=8080, minimum='25.6.0'):
     inspect(image,profile['architecture'],profile['elfMachine'])
     with tarfile.open(image) as archive:
         manifest, = json.load(archive.extractfile('manifest.json'))
@@ -104,7 +116,8 @@ def main():
     parser.add_argument('--vplc-app-id')
     parser.add_argument('--vplc-targets',help='Exact comma-separated WBM Information > Type values')
     parser.add_argument('--web-port',type=int,default=8080)
-    parser.add_argument('--min-firmware',default='2026.0.3')
+    parser.add_argument('--min-firmware',default='25.6.0',
+                        help='WBM compares the short form, e.g. 25.6.0 not 2025.6.0')
     args=parser.parse_args()
     validate_version(args.version)
     output=args.output.resolve()
@@ -122,7 +135,8 @@ def main():
         info=stage(profile,args.images/profile['archive'],directory,identifier,args.version,args.web_port,args.min_firmware)
         name=f'plcnext-iot-{args.version}-{key}-unsigned.app'
         records.append(dict(file=name,target=profile['target'],platform=profile['platform'],appId=identifier,
-            developmentId=supplied is None,signed=False,minFirmware=args.min_firmware,
+            developmentId=supplied is None,signed=False,
+            minFirmware=info['plcnextapp']['minfirmware_version'],
             imageId=info['ocicontainer']['images'][0]['id'],source=directory.name))
     subprocess.run(['docker','build','-t',PACKAGER,'-f',str(ROOT/'deploy/plcnext-app/Dockerfile'),str(ROOT)],check=True)
     for record in records:
@@ -137,6 +151,8 @@ def main():
             '-cat','/output/'+record['file'],'app_info.json'],check=True,capture_output=True)
         recovered=json.loads(result.stdout)
         assert recovered['plcnextapp']['identifier']==record['appId']
+        assert recovered['plcnextapp']['minfirmware_version']==record['minFirmware']
+        assert firmware_tuple(record['minFirmware'])[0] < 2000
         artifact=output/record['file']
         assert artifact.read_bytes()[:4]==b'hsqs'
         record['sha256']=hashlib.sha256(artifact.read_bytes()).hexdigest()

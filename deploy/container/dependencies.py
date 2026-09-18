@@ -1,4 +1,8 @@
-"""Install target wheels using the build host; never execute target binaries."""
+"""Install target wheels using the build host; never execute target binaries.
+
+linux/arm/v7 does not use this module: cffi has no PyPI armv7l wheel, so the
+Dockerfile native stage installs on the target platform instead.
+"""
 from pathlib import Path
 import subprocess
 import sys

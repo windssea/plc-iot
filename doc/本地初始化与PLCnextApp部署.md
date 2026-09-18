@@ -52,7 +52,7 @@ HTTP 服务限制并发连接数、请求头/体大小和请求时间；修改�
 
 最终交付结构应包含正式 App 标识、目标型号和最低固件声明、匹配架构的 OCI 镜像、Quadlet 启动定义及 App 持久目录声明。App 更新必须保留持久目录，容器内映射到 `/var/lib/plcnext-iot`，并验证 rootless UID 映射下的写权限。安装后打开初始化页，完成一次设置即可开始工作。
 
-当前已经完成容器内页面和自动恢复，并生成 AXC F 2152、vPLC 两份真正的 SquashFS `.app` 开发包，包含镜像、元数据、Quadlet 和持久目录声明。用户暂无正式 App ID，包使用固定本地开发标识且未签名。已完成结构校验，尚未完成 WBM 实机安装验收；不能假设 WBM 自动提供认证或代理。下载、重建和设备验收步骤见 [WBM 安装包说明](WBM安装包说明.md)。
+当前已经完成容器内页面和自动恢复，并生成 AXC F 2152 的 SquashFS `.app`。该包已在 2152 真机安装并启动。vPLC 本身是宿主机上的容器，把 OCI `.app` 再装进 vPLC WBM 会嵌套 Podman，启动时报 `OciContainerPartError`。vPLC 侧在宿主机加载 AMD64 镜像并用 Compose 运行，见 [多架构容器镜像说明](多架构容器镜像说明.md)。下载、2152 重建和验收步骤见 [WBM 安装包说明](WBM安装包说明.md)。
 
 ## 验证
 
@@ -76,4 +76,4 @@ AXC F 2152 的 Cortex-A9 是 32 位 ARM，本项目应使用 armv7 包。vPLC �
 
 资料：[AXC F 2152 官方产品页](https://www.phoenixcontact.com/en-us/products/controller-axc-f-2152-2404267)、[vPLCnext 官方部署仓库](https://github.com/PLCnext/vplcnextcontrol)、[官方 2026.0.3 版本相关公告](https://assets.phoenixcontact.com/file/a9721fd9-1ad4-495c-b341-15d3a5f363a9/media/original?pcsa-2026-00005_vde-2026-050.pdf=)。
 
-vPLC 本身运行在容器内，IoT App 的 OCI 启动与持久存储必须在该 vPLC 环境中实际验证，不能把普通宿主机 Docker 联调当作 vPLC AppManager 验收。现阶段保留共用页面和业务逻辑，分别准备目标安装包。
+vPLC 运行在宿主机容器内。IoT 采集器与它并列部署在同一台宿主机，不进入 vPLC 的 AppManager。2152 仍走 WBM Function Extension。页面和业务逻辑共用，安装物分开。

@@ -8,7 +8,7 @@
     "developmentAppId": "90260909002152"
   },
   "vplc": {
-    "target": "VPLCNEXT CONTROL 500,VPLCNEXT CONTROL 1000,VPLCNEXT CONTROL 2000,VPLCNEXT CONTROL 3000",
+    "target": "VPLCNEXT CONTROL 500 (x86),VPLCNEXT CONTROL 1000 (x86),VPLCNEXT CONTROL 2000 (x86),VPLCNEXT CONTROL 3000 (x86)",
     "platform": "linux/amd64",
     "archive": "plcnext-iot-amd64.tar",
     "architecture": "amd64",

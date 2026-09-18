@@ -22,7 +22,10 @@ class PlcnextAppTests(unittest.TestCase):
 
     def test_architecture_and_app_identity_separated(self):
         self.assertEqual(TARGETS['axcf2152']['platform'],'linux/arm/v7')
+        self.assertEqual(TARGETS['axcf2152']['target'],'AXC F 2152')
         self.assertEqual(TARGETS['vplc']['platform'],'linux/amd64')
+        self.assertEqual(TARGETS['vplc']['target'],
+                         'VPLCNEXT CONTROL 500 (x86),VPLCNEXT CONTROL 1000 (x86),VPLCNEXT CONTROL 2000 (x86),VPLCNEXT CONTROL 3000 (x86)')
         self.assertNotEqual(TARGETS['axcf2152']['developmentAppId'],TARGETS['vplc']['developmentAppId'])
 
     def test_only_app_storage_and_rootless_user_mapping(self):
@@ -36,7 +39,16 @@ class PlcnextAppTests(unittest.TestCase):
     def test_invalid_packaging_values_rejected(self):
         for version in ('../escape','1.2.999','dev','1.2.3.4'):
             with self.assertRaises(ValueError):validate_version(version)
-        for identifier,port,minimum in [('bad',8080,'2026.0.3'),('1'*14,80,'2026.0.3'),('1'*14,8080,'2024.0.0')]:
+        for identifier,port,minimum in [('bad',8080,'25.6.0'),('1'*14,80,'25.6.0'),('1'*14,8080,'24.0.0')]:
             with self.assertRaises(ValueError):
                 metadata(TARGETS['axcf2152'],identifier,'0.2.0','a'*64,'image',port,minimum)
+        value=metadata(TARGETS['axcf2152'],TARGETS['axcf2152']['developmentAppId'],
+                       '0.2.0','a'*64,'plcnext-iot:0.2.0',8080,'25.6.0')
+        self.assertEqual(value['plcnextapp']['minfirmware_version'],'25.6.0')
+        value=metadata(TARGETS['axcf2152'],TARGETS['axcf2152']['developmentAppId'],
+                       '0.2.0','a'*64,'plcnext-iot:0.2.0',8080,'2025.6.0')
+        self.assertEqual(value['plcnextapp']['minfirmware_version'],'25.6.0')
+        with self.assertRaises(ValueError):
+            metadata(TARGETS['axcf2152'],TARGETS['axcf2152']['developmentAppId'],
+                     '0.2.0','a'*64,'image',8080,'2024.0.0')
         with self.assertRaises(ValueError):quadlet('bad\nExec=command')
