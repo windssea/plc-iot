@@ -1,4 +1,4 @@
-"""Run the local Agent lifecycle with optional read-only Modbus TCP collection."""
+"""Run the local Agent lifecycle with optional read-only device collection."""
 import argparse
 import asyncio
 from dataclasses import asdict
@@ -10,6 +10,7 @@ import signal
 from tools import _source_path  # noqa: F401
 from plcnext_iot.core.lifecycle import AgentLifecycle, LifecycleError
 from plcnext_iot.core.settings import AgentSettings
+from plcnext_iot.devices.factory import DRIVERS, bind
 from plcnext_iot.devices.runtime import DeviceRuntime
 from plcnext_iot.config.store import StoreError
 
@@ -23,11 +24,10 @@ async def run(settings, configs, run_seconds, driver='none', mqtt_settings=None,
               stop_event=None, boot_id=None):
     from plcnext_iot.points.samples import SampleBuffer
     samples = SampleBuffer()
-    if driver == 'modbus-tcp':
-        from plcnext_iot.devices.modbus import ModbusRunner
-        runtime = DeviceRuntime(lambda device: ModbusRunner(device, runtime, samples))
-    else:
+    if driver == 'none':
         runtime = DeviceRuntime()
+    else:
+        runtime = DeviceRuntime(lambda device: bind(runtime, samples, DRIVERS[driver])(device))
     agent = AgentLifecycle(settings, runtime)
     async def emit_samples():
         while True:
@@ -122,7 +122,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bootstrap", type=Path, required=True)
     parser.add_argument("--config", type=Path, action="append", default=[])
-    parser.add_argument('--driver', choices=('none', 'modbus-tcp'), default='none')
+    parser.add_argument('--driver', choices=('none', 'modbus-tcp', 'opcua', 'all'), default='none')
     parser.add_argument('--mqtt',type=Path,help='Optional separate MQTT settings JSON')
     parser.add_argument('--quiet-samples', action='store_true', help='Suppress per-point diagnostic logs; telemetry is unaffected')
     parser.add_argument("--run-seconds", type=float, help="Optional local smoke-test duration; 0 stops after configuration")

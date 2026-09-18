@@ -14,7 +14,7 @@ Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
 EnvironmentFile=-/etc/plcnext-iot/agent.env
 ExecStartPre=/opt/plcnext-iot/current/.venv/bin/python -m tools.preflight --bootstrap /etc/plcnext-iot/bootstrap.json --mqtt /etc/plcnext-iot/mqtt.json --release-root /opt/plcnext-iot/current
-ExecStart=/opt/plcnext-iot/current/.venv/bin/python -m tools.agent --bootstrap /etc/plcnext-iot/bootstrap.json --mqtt /etc/plcnext-iot/mqtt.json --driver modbus-tcp --quiet-samples
+ExecStart=/opt/plcnext-iot/current/.venv/bin/python -m tools.agent --bootstrap /etc/plcnext-iot/bootstrap.json --mqtt /etc/plcnext-iot/mqtt.json --driver all --quiet-samples
 Restart=on-failure
 RestartSec=10
 TimeoutStopSec=1800

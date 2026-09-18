@@ -65,7 +65,7 @@ async def _supervise(store, server, stop):
         run_stop = asyncio.Event()
         watcher = asyncio.create_task(_watch_reload(stop, server, seq, run_stop), name='iot-reload-watch')
         try:
-            code = await run(settings, [], None, 'modbus-tcp', mqtt, True, run_stop, boot_id)
+            code = await run(settings, [], None, 'all', mqtt, True, run_stop, boot_id)
         finally:
             watcher.cancel()
             await asyncio.gather(watcher, return_exceptions=True)

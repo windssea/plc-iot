@@ -80,6 +80,12 @@ class ContractTests(unittest.TestCase):
         self.point()["pollIntervalMs"] = 0
         self.assertIn("SCHEMA_INVALID", self.codes("configSet", self.config))
 
+    def test_opcua_examples_are_protocol_specific(self):
+        opcua = json.loads((ROOT / "contracts/examples/valid/config-opcua.json").read_text(encoding="utf-8"))
+        self.assertEqual(set(), self.codes("configSet", opcua))
+        opcua["config"]["devices"][0]["protocol"] = "modbus_tcp"
+        self.assertIn("SCHEMA_INVALID", self.codes("configSet", opcua))
+
     def test_types_and_byte_orders_match_modbus_area(self):
         for dtype, area, order, valid in [
             ("uint16", "holding_register", "AB", True),

@@ -1,6 +1,6 @@
 # IoT v1 通信契约
 
-状态：阶段 A 已实现，作为后续 Agent 与模拟端的共同输入规范。配置归属 PLC 子设备，gatewayId 表示接收快照的 PLC 采集身份。
+状态：v1 契约已落地，Agent 与模拟端共用。配置归属 PLC 子设备，gatewayId 表示接收快照的 PLC 采集身份。protocol 允许 `modbus_tcp` 与 `opcua`。参考校验器只做结构和静态语义检查；版本事务、ACK、采集和入库由运行时完成。
 
 参考校验实现现已位于 `src/plcnext_iot/contracts.py`；`tools/contract_validation.py` 保持兼容入口。这里描述的校验器本身仍不持久化消息，配置状态管理见项目的配置持久化说明。
 
@@ -57,15 +57,19 @@ CLI 不带参数时检查 manifest 全部样例；无效样例产生预期错误
 
 编辑某子设备后仍汇总整个 PLC 快照，遗漏子设备即删除。空 devices 合法。设备 points 允许为空，表示暂未配点；enabled=false 的设备/点仍必须满足所有配置约束。
 
-Device 必填 deviceId/name/enabled/protocol/connection/points。protocol 只允许 modbus_tcp。connection 必填 host/port/unitId/connectTimeoutMs/requestTimeoutMs/retryCount：port 1–65535，unitId 0–255，超时 1–300000ms，retryCount 0–10。unitId 是 TCP Unit Identifier 字段范围，具体设备或 TCP→RTU 网关允许值需按手册确认；本契约不发送广播写请求。
+Device 必填 deviceId/name/enabled/protocol/connection/points。protocol 允许 `modbus_tcp` 或 `opcua`。同一 PLC 快照可混合两种协议；每个子设备只能有一种协议，点位对象不能混用 `modbus` 与 `opcua` 字段。
 
-Point 必填 pointId/name/enabled/dataType/pollIntervalMs/scale/offset/reportMode/reportIntervalMs/deadband/staleAfterMs/modbus；unit 可选，不填表示无单位标签。周期及 stale 间隔为 1–86400000ms，staleAfterMs ≥ pollIntervalMs。
+Modbus TCP 的 connection 必填 host/port/unitId/connectTimeoutMs/requestTimeoutMs/retryCount：port 1–65535，unitId 0–255，超时 1–300000ms，retryCount 0–10。unitId 是 TCP Unit Identifier 字段范围，具体设备或 TCP→RTU 网关允许值需按手册确认；本契约不发送广播写请求。
 
-| dataType | 区域 | 占用 | byteOrder | 转换 |
-|---|---|---|---|---|
-| bool | coil / discrete_input | 1 位 | 必须省略 | scale=1、offset=0、deadband=0 |
-| int16 / uint16 | holding_register / input_register | 1 寄存器 | AB / BA，必填 | value=raw×scale+offset |
-| int32 / uint32 / float32 | holding_register / input_register | 2 寄存器 | ABCD/BADC/CDAB/DCBA，必填 | value=raw×scale+offset |
+OPC UA 的 connection 必填 host/port/path/securityPolicy/securityMode/connectTimeoutMs/requestTimeoutMs/retryCount。path 可为空字符串或 `/iot-simulator/` 这类 URI 路径，Agent 拼成 `opc.tcp://{host}:{port}{path}`。securityPolicy 为 `None` 或 `Basic256Sha256`；`None` 必须搭配 securityMode `None`，`Basic256Sha256` 必须搭配 `Sign` 或 `SignAndEncrypt`。username 与 passwordEnv 必须同时出现或同时省略；密码只引用本地环境变量名，不得写入业务快照。当前采集实现连接 `None/None`（可选用用户名）；证书加密模式会应用配置，但运行期按 `BAD_CONFIGURATION` 处理，直到设备端证书引导完成。
+
+Point 必填 pointId/name/enabled/dataType/pollIntervalMs/scale/offset/reportMode/reportIntervalMs/deadband/staleAfterMs，以及与 protocol 对应的 `modbus` 或 `opcua`；unit 可选，不填表示无单位标签。周期及 stale 间隔为 1–86400000ms，staleAfterMs ≥ pollIntervalMs。OPC UA 的 `opcua.nodeId` 使用标准字符串形式（如 `ns=2;s=tank-A.level`），同一子设备内不得重复。
+
+| dataType | Modbus 区域 | 占用 | byteOrder | OPC UA 期望类型 | 转换 |
+|---|---|---|---|---|---|
+| bool | coil / discrete_input | 1 位 | 必须省略 | Boolean | scale=1、offset=0、deadband=0 |
+| int16 / uint16 | holding_register / input_register | 1 寄存器 | AB / BA，必填 | Int16 / UInt16 | value=raw×scale+offset |
+| int32 / uint32 / float32 | holding_register / input_register | 2 寄存器 | ABCD/BADC/CDAB/DCBA，必填 | Int32 / UInt32 / Float | value=raw×scale+offset |
 
 address 使用零基偏移 0–65535，完整宽度必须落在地址空间内。40001 的传统 holding register 编号需配置端显式转换为 area=holding_register/address=0，不能在 Agent 中猜测。
 
@@ -112,6 +116,7 @@ event：messageId/sessionId/activeConfigVersion/level/code/message，deviceId/po
 | GATEWAY_MISMATCH | 与调用方传入的可信 PLC 身份不一致 |
 | DUPLICATE_DEVICE_ID | 子设备/设备状态身份重复 |
 | DUPLICATE_POINT_ID | 同子设备内点位身份重复 |
+| DUPLICATE_NODE_ID | 同子设备内 OPC UA NodeId 重复 |
 | INVALID_ADDRESS | 完整寄存器宽度越界 |
 | INVALID_STALE_INTERVAL | 过期时间短于轮询周期 |
 | POINT_LIMIT_EXCEEDED | 整个 PLC 配置的总点数超限 |
@@ -122,10 +127,10 @@ event：messageId/sessionId/activeConfigVersion/level/code/message，deviceId/po
 
 以上为参考校验器的本地 Issue。线上 Error.code 还预留 VERSION_CONFLICT、STALE_VERSION、STORAGE_ERROR 等运行错误；不是所有本地错误都可安全构成 ACK，例如无法识别原请求身份时只能记诊断。
 
-本工具**不验证**版本递增、同版本内容一致、真实身份绑定、在线状态、TLS/ACL、配置原子应用、ACK 是否在途、业务数据库落盘、7 天补传期限或未来时间容差。这些需要下一阶段的运行上下文。结构与静态语义校验通过不能代替这些检查。
+本工具**不验证**版本递增、同版本内容一致、真实身份绑定、在线状态、TLS/ACL、配置原子应用、ACK 是否在途、业务数据库落盘、7 天补传期限或未来时间容差。这些由配置存储、MQTT 服务、Outbox 和接收端处理。结构与静态语义校验通过不能代替运行时检查。
 
 ## 8. 版本及示例维护
 
 修改字段含义或必填条件时同步更新 Schema、样例、参考校验器和测试；破坏兼容性时增加协议版本。发布配置的 configVersion 增长不能替代 schemaVersion 变更。
 
-现有可选字段只有 unit、sourceTimestamp、诊断定位 deviceId/pointId 及 modbus.byteOrder 的条件省略。禁止通过自动忽略未知字段获得表面兼容性。
+现有可选字段：point.unit、data.sourceTimestamp、诊断定位 deviceId/pointId、modbus.byteOrder（按类型条件省略）、opcua connection 的 username/passwordEnv。禁止通过自动忽略未知字段获得表面兼容性。`event` Topic 已在契约中定义，当前 Agent 不发布。

@@ -1,0 +1,24 @@
+version: 1
+random_seed: 42
+web:
+  host: 127.0.0.1
+  port: 18080
+opcua:
+  enabled: true
+  host: 127.0.0.1
+  port: 14840
+  endpoint_path: /iot-simulator/
+  server_name: PLCnext IoT Closed Loop
+  application_uri: urn:plcnext:iot-closed-loop
+  namespace_uri: urn:plcnext:iot-closed-loop:devices
+mqtt:
+  enabled: false
+  host: 127.0.0.1
+  port: 1883
+  protocol_version: '3.1.1'
+  client_id: plcnext-iot-simulator-closed-loop
+  keepalive: 60
+modbus:
+  enabled: true
+  host: 127.0.0.1
+  port: 11502

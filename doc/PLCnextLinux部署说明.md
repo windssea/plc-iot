@@ -1,12 +1,12 @@
 # PLCnext Linux 部署说明
 
-本阶段提供源代码发布包、固定依赖集、安装/切换脚本、本地预检和 systemd unit。已验证 Linux x86_64 容器中的安装、普通服务用户运行、SIGTERM 退出和配置恢复。没有连接真实 PLC，也未在容器中运行 systemd 管理器。
+本阶段提供源代码发布包、固定依赖集、安装/切换脚本、本地预检和 systemd unit。这是 0.1.0 起的文件配置入口（bootstrap.json / mqtt.json / agent.env）。**0.2.0 优先使用容器或 WBM App**，由浏览器初始化，不必在现场维护这些文件。裸机 unit 现已使用 `--driver all`，可同时执行 Modbus TCP 与 OPC UA。已验证 Linux x86_64 容器中的安装、普通服务用户运行、SIGTERM 退出和配置恢复。没有连接真实 PLC，也未在容器中运行 systemd 管理器。
 
 ## 目标环境
 
 目标要求 Python **3.12**（含 venv、pip、SQLite、SSL）、可写持久目录，以及运行中的 systemd。预检会报告架构。不同 PLC 型号和固件的 Python、libc 与初始化系统不可默认相同：Phoenix Contact 的 [2025 固件应用变更说明](https://www.plcnext-community.net/robohelp/infocenter/assets/docs/ah_en_application-relevant_changes_fw_2025_111781_en_00.pdf) 包含 SysV 到 systemd 的迁移事项。旧固件需单独适配，当前脚本不安装 Python、不修改 PLC 原有运行时。
 
-依赖版本见 `requirements-runtime.lock`，包括传递依赖。`rpds-py` 含原生扩展，离线 wheelhouse 必须匹配目标 CPU、Python ABI 和 libc；不要将 Windows 虚拟环境拷到 PLC。当前锁文件锁版本，未提供供应链签名或依赖包哈希锁。
+依赖版本见 `requirements-runtime.lock`，包括传递依赖。`rpds-py` 与 `cryptography` 含原生扩展，离线 wheelhouse 必须匹配目标 CPU、Python ABI 和 libc；不要将 Windows 虚拟环境拷到 PLC。当前锁文件锁版本，未提供供应链签名或依赖包哈希锁。预检核验 jsonschema、pymodbus、paho-mqtt 和 asyncua 的锁定版本。
 
 ## 发布布局
 
@@ -88,4 +88,4 @@ systemctl daemon-reload
 ./.venv/Scripts/python.exe -m tools.deployment_smoke
 ```
 
-Linux 验收使用独立 `python:3.12-alpine` 容器，在容器内执行安装及信号测试，不挂载主机系统配置/数据目录。生成的包与脚本留在 `.local/deployment-*` 供复查。systemd 开机启动、TLS 实际握手、PLC CPU/内存/闪存消耗及长期断网补传仍需在目标型号/固件上验收。下一步应基于实际 PLC 型号、固件、CPU 架构和 Python 可用情况完成真机部署，随后再推进 Hub 对接。
+Linux 验收使用独立 `python:3.12-alpine` 容器，在容器内执行安装及信号测试，不挂载主机系统配置/数据目录。生成的包与脚本留在 `.local/deployment-*` 供复查。systemd 开机启动、TLS 实际握手、PLC CPU/内存/闪存消耗及长期断网补传仍需在目标型号/固件上验收。0.2.0 现场安装优先走容器或 WBM；裸机脚本仍可用于无 AppManager 的环境。真机部署完成后再对接 Hub。

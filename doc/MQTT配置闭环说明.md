@@ -61,7 +61,7 @@ docker compose -f deploy/compose.mqtt-test.yml up -d
 
 工具不自动递增版本、不分配业务 messageId，也不修改文件；发布方应保存配置文件，用新的更高版本发布变更，重试时保留原身份。已有数据库版本高于示例 v10 时，示例会被按版本规则拒绝。测试 Broker 未开启持久化，重建后 retained 配置丢失，需要配置端重新下发；Agent 已提交配置仍从本地恢复。
 
-需要采集模拟设备时，在 Agent 命令增加 `--driver modbus-tcp`，并下发与模拟器点位匹配的完整配置。后续阶段已接入 [遥测报告与持久补传](遥测报告与补传说明.md)，启用 MQTT 时同时发布 data 并等待 STORED。
+需要采集模拟设备时，在 Agent 命令增加 `--driver all`（或 `--driver modbus-tcp` / `--driver opcua`），并下发与模拟器点位匹配的完整配置。启用 MQTT 时同时发布 data、心跳和设备状态，并等待 data/ack=STORED；见 [遥测报告与持久补传](遥测报告与补传说明.md) 和 [批量采集与运行诊断](批量采集与运行诊断说明.md)。
 
 联调完成后：
 
@@ -81,10 +81,10 @@ docker compose -f deploy/compose.mqtt-test.yml down
 
 ## 有界资源与当前限制
 
-每个连接最多缓存 8 条入站消息，单条应用上限 2 MiB；满队列、超长或非订阅 Topic 计入丢弃数。Paho 发出队列最多 32 条、最多 8 条在途。接收线程不会为每条消息无限创建 asyncio 任务。当前丢弃计数用于本地诊断，尚未接入心跳。
+每个连接最多缓存 8 条入站消息，单条应用上限 2 MiB；满队列、超长或非订阅 Topic 计入丢弃数。Paho 发出队列最多 32 条、最多 8 条在途。接收线程不会为每条消息无限创建 asyncio 任务。入站丢弃计数只在进程内累计，不进入心跳；心跳 `queue` 统计的是遥测 Outbox，不是 MQTT 入站丢弃。
 
-MQTT 跳间 PUBACK 只确认传输；满队列丢弃时也可能已有 PUBACK，发送方必须以 config/ack 为准并重试。Paho 会先完整接收报文，再执行应用长度检查，所以 Broker 也必须限制最大 packet size；测试配置已设置该上限。
+MQTT 的 PUBACK 只确认传输；满队列丢弃时也可能已有 PUBACK，发送方必须以 config/ack 为准并重试。Paho 会先完整接收报文，再执行应用长度检查，所以 Broker 也必须限制最大 packet size；测试配置已设置该上限。
 
-ACK 尚无独立持久 Outbox，发送中断后依靠配置重发与存储幂等恢复。传输使用 clean_session=true，不依赖持久订阅队列。connect 超时设为 3 秒、SUBACK/PUBACK 等待 5 秒；系统 DNS 和线程退出仍受操作系统影响，不是进程硬终止期限。
+配置 ACK 尚无独立持久 Outbox，发送中断后依靠配置重发与存储幂等恢复。传输使用 clean_session=true，不依赖持久订阅队列。connect 超时设为 3 秒、SUBACK/PUBACK 等待 5 秒；系统 DNS 和线程退出仍受操作系统影响，不是进程硬终止期限。
 
-TLS 保持证书/主机名校验，但本次只验收了本地明文 Broker；生产证书、认证和 Broker Topic ACL 需在部署环境验证。遥测 data/dataAck、报告策略和补传现已在后续阶段实现；心跳和 Hub 对接尚未实现。status online 仅表示 MQTT 配置通道可用，不表示现场设备在线。
+TLS 保持证书/主机名校验，但本地联调只验收了明文 Broker；生产证书、认证和 Broker Topic ACL 需在部署环境验证。`status` online 仅表示 MQTT 配置通道可用，不表示现场设备在线。契约中的 `event` Topic 已定义，Agent 尚未发布。Hub 对接仍未开始。

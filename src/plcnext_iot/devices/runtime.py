@@ -35,7 +35,7 @@ class SampleContext:
 def _execution_key(device):
     # Reporting/name/unit belong to the published snapshot, not driver lifetime.
     return (device.protocol, device.connection,
-            tuple((p.point_id, p.data_type, p.poll_interval_ms, p.scale, p.offset, p.modbus)
+            tuple((p.point_id, p.data_type, p.poll_interval_ms, p.scale, p.offset, p.modbus, p.opcua)
                   for p in device.points if p.enabled))
 
 

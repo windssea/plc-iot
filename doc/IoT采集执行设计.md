@@ -1,8 +1,10 @@
 # IoT 采集执行设计
 
-版本：0.1 · 2026-09-07 · 设计状态：待进入编码
+版本：0.1 · 2026-09-07 · 原文设计状态：待进入编码
 
 本文细化《初始技术设计》，聚焦 PLC 子设备的采集执行。Hub 仅作为未来配置端和接收端，本文不规定其页面或表结构。
+
+**实现现状：** 模块已按本文落地。诊断在 `messaging/health.py`，没有独立 `health/` 包。OPC UA 已实现为 `drivers/opcua.py` 与 `devices/opcua.py`，不是空类。模拟配置/接收端在 `tools/`，不是 `tools/simulator/`。南向 MQTT 与 PLC Bridge 仍未实现。
 
 ## 1. 配置从子设备到 PLC 的转换
 

@@ -35,7 +35,7 @@ class HealthPublisher:
                 total += sum(p.enabled for p in device.points)
             devices.append(state)
         return dict(schemaVersion=1, gatewayId=agent.settings.gateway_id, timestamp=timestamp,
-                    sessionId=session_id, bootId=self.boot_id, agentVersion='0.1.0',
+                    sessionId=session_id, bootId=self.boot_id, agentVersion='0.2.0',
                     activeConfigVersion=version, uptimeSeconds=max(0, int(now - self.started)),
                     agentState=agent.state, devices=devices,
                     points=dict(total=total, good=good, bad=total-good), queue=queue)

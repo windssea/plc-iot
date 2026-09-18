@@ -20,6 +20,11 @@ class ModbusAddress:
 
 
 @dataclass(frozen=True)
+class OpcUaAddress:
+    node_id: str
+
+
+@dataclass(frozen=True)
 class PointConfig:
     point_id: str
     name: str
@@ -33,17 +38,23 @@ class PointConfig:
     report_interval_ms: int
     deadband: int | float
     stale_after_ms: int
-    modbus: ModbusAddress
+    modbus: ModbusAddress | None
+    opcua: OpcUaAddress | None = None
 
 
 @dataclass(frozen=True)
 class ConnectionConfig:
     host: str
     port: int
-    unit_id: int
+    unit_id: int | None
     connect_timeout_ms: int
     request_timeout_ms: int
     retry_count: int
+    path: str | None = None
+    security_policy: str | None = None
+    security_mode: str | None = None
+    username: str | None = None
+    password_env: str | None = None
 
 
 @dataclass(frozen=True)
@@ -77,18 +88,29 @@ def _json(value):
                       separators=(",", ":"), allow_nan=False)
 
 
+def _point(p, protocol):
+    common = (p["pointId"], p["name"], p["enabled"], p["dataType"], p["pollIntervalMs"],
+              p["scale"], p["offset"], p.get("unit"), p["reportMode"], p["reportIntervalMs"],
+              p["deadband"], p["staleAfterMs"])
+    if protocol == "opcua":
+        return PointConfig(*common, None, OpcUaAddress(p["opcua"]["nodeId"]))
+    return PointConfig(*common, ModbusAddress(
+        p["modbus"]["area"], p["modbus"]["address"], p["modbus"].get("byteOrder")))
+
+
+def _connection(c, protocol):
+    timeouts = (c["connectTimeoutMs"], c["requestTimeoutMs"], c["retryCount"])
+    if protocol == "opcua":
+        return ConnectionConfig(c["host"], c["port"], None, *timeouts, c["path"],
+                                c["securityPolicy"], c["securityMode"],
+                                c.get("username"), c.get("passwordEnv"))
+    return ConnectionConfig(c["host"], c["port"], c["unitId"], *timeouts)
+
+
 def _device(d):
-    c = d["connection"]
-    points = tuple(PointConfig(
-        p["pointId"], p["name"], p["enabled"], p["dataType"], p["pollIntervalMs"],
-        p["scale"], p["offset"], p.get("unit"), p["reportMode"], p["reportIntervalMs"],
-        p["deadband"], p["staleAfterMs"], ModbusAddress(
-            p["modbus"]["area"], p["modbus"]["address"], p["modbus"].get("byteOrder")))
-        for p in d["points"])
     return DeviceConfig(d["deviceId"], d["name"], d["enabled"], d["protocol"],
-                        ConnectionConfig(c["host"], c["port"], c["unitId"],
-                                         c["connectTimeoutMs"], c["requestTimeoutMs"],
-                                         c["retryCount"]), points)
+                        _connection(d["connection"], d["protocol"]),
+                        tuple(_point(p, d["protocol"]) for p in d["points"]))
 
 
 @dataclass(frozen=True)

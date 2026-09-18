@@ -32,7 +32,8 @@ class MqttMessagesTests(unittest.TestCase):
 
     def test_local_errors_are_mapped_to_wire_codes(self):
         for local, expected in [('UNSUPPORTED_DRIVER','APPLY_FAILED'),('MESSAGE_ID_CONFLICT','VERSION_CONFLICT'),
-                                ('STORAGE_ERROR','STORAGE_ERROR'),('RESOURCE_LIMIT','RESOURCE_LIMIT')]:
+                                ('STORAGE_ERROR','STORAGE_ERROR'),('RESOURCE_LIMIT','RESOURCE_LIMIT'),
+                                ('DUPLICATE_NODE_ID','DUPLICATE_NODE_ID')]:
             out = self.ack(self.payload(), ApplyResult('REJECTED', 0, local), 'PLC-01')
             self.assertEqual(validate_message('configAck',out), [])
             self.assertEqual(json.loads(out)['errors'][0]['code'], expected)

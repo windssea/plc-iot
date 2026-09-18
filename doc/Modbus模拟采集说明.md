@@ -7,7 +7,8 @@
 - `src/plcnext_iot/drivers/modbus.py`：串行读取、连接与请求超时、有界重试、解码。
 - `src/plcnext_iot/devices/modbus.py`：每个 PLC 子设备的独立轮询任务、退避、停止及重启。
 - `src/plcnext_iot/points/samples.py`：不可变 Sample 和有界本地缓冲。
-- `tools/agent.py`：显式选择 `--driver modbus-tcp`，输出 sample JSON 事件。
+- `src/plcnext_iot/points/read_plan.py`：按区域和周期合并连续/重叠地址。
+- `tools/agent.py`：`--driver modbus-tcp` 或 `--driver all`，输出 sample JSON 事件。
 - `tools/mock_device_smoke.py`：跨项目验收；`mock_device_server.py` 是其子进程辅助入口。
 
 运行依赖为 `requirements-runtime.txt`。PyModbus 固定为 3.13.1，与当前模拟器一致；客户端调用按子设备串行，Unit ID 使用 `device_id` 参数。API 依据 [PyModbus 3.13.1 官方文档](https://pymodbus.readthedocs.io/en/v3.13.1/source/client.html)。目标 PLC 镜像兼容性仍需实机验证。
@@ -24,7 +25,7 @@
 | Modbus 异常响应或协议错误 | BAD_PROTOCOL | None |
 | 长度不符、非有限数或转换失败 | BAD_DECODE | None |
 
-每个设备一个客户端，逐点读取，慢请求只影响所属子设备。`retryCount` 是每次点读取遇到连接/超时错误后的额外次数，重试间隔从 100ms 开始、上限 1s。失败后设备连接退避从 500ms 增至最多 30s；退避期间按轮询周期生成坏质量样本，不反复发起网络请求。地址类协议错误不关闭健康连接。
+每个设备一个客户端；同连接请求串行。当前按区域和采集周期合并连续或重叠地址后再读块，空洞不合并，见 [批量采集与运行诊断](批量采集与运行诊断说明.md)。`retryCount` 是读块遇到连接/超时错误后的额外次数，重试间隔从 100ms 开始、上限 1s。失败后设备连接退避从 500ms 增至最多 30s；退避期间按轮询周期生成坏质量样本，不反复发起网络请求。地址类协议错误不关闭健康连接。
 
 轮询使用单调时钟，错过周期直接跳过，不补历史请求。配置 APPLIED 表示本地任务已建立，远端离线不会阻止合法配置提交。样本包含 config_version、device_id、point_id、timestamp、value、quality；timestamp 是本地读取结果产生时刻，Unix 毫秒，不是设备源时间。
 
@@ -65,6 +66,6 @@
 
 ## 当前边界
 
-批量读块、非法地址拆分定位和设备状态汇总尚未实现。后续阶段已完成 [MQTT 配置闭环](MQTT配置闭环说明.md) 和 [报告、陈旧判断及遥测补传](遥测报告与补传说明.md)。采样周期极短时仅尽力执行，不保证吞吐。Hub 对接保持在独立 IoT 闭环之后。
+批量读块、非法地址有限拆分、设备状态和心跳已实现，见 [批量采集与运行诊断](批量采集与运行诊断说明.md)。MQTT 配置、报告策略和遥测补传已接入。采样周期极短时仅尽力执行，不保证吞吐。Hub 对接保持在独立 IoT 闭环之后。
 
 自动测试覆盖协议请求、类型/字节序、质量分类、有限重试、停止取消、跨版本在途采样隔离、队列丢弃和 CLI 子进程。真实模拟器联调是单独命令，不作为普通单元测试的外部依赖。

@@ -132,6 +132,7 @@ def _config_issues(config: dict) -> list[Issue]:
                                 "Child device identity must be unique within the PLC."))
         devices.add(device["deviceId"])
         points = set()
+        node_ids = set()
         total += len(device["points"])
         for pi, point in enumerate(device["points"]):
             pp = f"{dp}/points/{pi}"
@@ -139,13 +140,20 @@ def _config_issues(config: dict) -> list[Issue]:
                 issues.append(Issue("DUPLICATE_POINT_ID", pp + "/pointId",
                                     "Point identity must be unique within its child device."))
             points.add(point["pointId"])
-            width = 2 if point["dataType"] in ("int32", "uint32", "float32") else 1
-            if point["modbus"]["address"] + width - 1 > 65535:
-                issues.append(Issue("INVALID_ADDRESS", pp + "/modbus/address",
-                                    "Complete value width exceeds the address range."))
             if point["staleAfterMs"] < point["pollIntervalMs"]:
                 issues.append(Issue("INVALID_STALE_INTERVAL", pp + "/staleAfterMs",
                                     "Stale interval cannot be shorter than polling interval."))
+            if device["protocol"] == "modbus_tcp":
+                width = 2 if point["dataType"] in ("int32", "uint32", "float32") else 1
+                if point["modbus"]["address"] + width - 1 > 65535:
+                    issues.append(Issue("INVALID_ADDRESS", pp + "/modbus/address",
+                                        "Complete value width exceeds the address range."))
+            elif device["protocol"] == "opcua":
+                node_id = point["opcua"]["nodeId"]
+                if node_id in node_ids:
+                    issues.append(Issue("DUPLICATE_NODE_ID", pp + "/opcua/nodeId",
+                                        "OPC UA node identity must be unique within its child device."))
+                node_ids.add(node_id)
     if total > 2000:
         issues.append(Issue("POINT_LIMIT_EXCEEDED", "/config/devices",
                             "Total configured points exceed the PLC limit."))

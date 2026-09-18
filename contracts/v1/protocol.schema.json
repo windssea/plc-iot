@@ -55,6 +55,7 @@
             "GATEWAY_MISMATCH",
             "DUPLICATE_DEVICE_ID",
             "DUPLICATE_POINT_ID",
+            "DUPLICATE_NODE_ID",
             "INVALID_ADDRESS",
             "INVALID_STALE_INTERVAL",
             "POINT_LIMIT_EXCEEDED",
@@ -166,6 +167,267 @@
           "maximum": 10
         }
       }
+    },
+    "opcua": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodeId"
+      ],
+      "properties": {
+        "nodeId": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 256,
+          "pattern": "^(ns=[0-9]{1,5};)?(i=[0-9]{1,10}|s=[A-Za-z0-9._~%+/-]{1,200}|g=[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}|b=[A-Za-z0-9+/=]{4,256})(?![\\s\\S])"
+        }
+      }
+    },
+    "opcuaConnection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "host",
+        "port",
+        "path",
+        "securityPolicy",
+        "securityMode",
+        "connectTimeoutMs",
+        "requestTimeoutMs",
+        "retryCount"
+      ],
+      "properties": {
+        "host": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9.:-]*(?![\\s\\S])"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "path": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^(|(/[A-Za-z0-9._~-]+)*/?)$"
+        },
+        "securityPolicy": {
+          "enum": [
+            "None",
+            "Basic256Sha256"
+          ]
+        },
+        "securityMode": {
+          "enum": [
+            "None",
+            "Sign",
+            "SignAndEncrypt"
+          ]
+        },
+        "username": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._@-]{1,128}(?![\\s\\S])"
+        },
+        "passwordEnv": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}(?![\\s\\S])"
+        },
+        "connectTimeoutMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300000
+        },
+        "requestTimeoutMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300000
+        },
+        "retryCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "username"
+            ]
+          },
+          "then": {
+            "required": [
+              "passwordEnv"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "passwordEnv"
+            ]
+          },
+          "then": {
+            "required": [
+              "username"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "securityPolicy": {
+                "const": "None"
+              }
+            },
+            "required": [
+              "securityPolicy"
+            ]
+          },
+          "then": {
+            "properties": {
+              "securityMode": {
+                "const": "None"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "securityPolicy": {
+                "const": "Basic256Sha256"
+              }
+            },
+            "required": [
+              "securityPolicy"
+            ]
+          },
+          "then": {
+            "properties": {
+              "securityMode": {
+                "enum": [
+                  "Sign",
+                  "SignAndEncrypt"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "opcuaPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pointId",
+        "name",
+        "enabled",
+        "dataType",
+        "pollIntervalMs",
+        "scale",
+        "offset",
+        "reportMode",
+        "reportIntervalMs",
+        "deadband",
+        "staleAfterMs",
+        "opcua"
+      ],
+      "properties": {
+        "pointId": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "dataType": {
+          "enum": [
+            "bool",
+            "int16",
+            "uint16",
+            "int32",
+            "uint32",
+            "float32"
+          ]
+        },
+        "pollIntervalMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400000
+        },
+        "scale": {
+          "type": "number"
+        },
+        "offset": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "reportMode": {
+          "enum": [
+            "cyclic",
+            "change",
+            "change_or_cyclic"
+          ]
+        },
+        "reportIntervalMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400000
+        },
+        "deadband": {
+          "type": "number",
+          "minimum": 0
+        },
+        "staleAfterMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400000
+        },
+        "opcua": {
+          "$ref": "#/$defs/opcua"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "dataType": {
+                "const": "bool"
+              }
+            },
+            "required": [
+              "dataType"
+            ]
+          },
+          "then": {
+            "properties": {
+              "scale": {
+                "const": 1
+              },
+              "offset": {
+                "const": 0
+              },
+              "deadband": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ]
     },
     "point": {
       "type": "object",
@@ -386,20 +648,68 @@
           "type": "boolean"
         },
         "protocol": {
-          "const": "modbus_tcp"
+          "enum": [
+            "modbus_tcp",
+            "opcua"
+          ]
         },
-        "connection": {
-          "$ref": "#/$defs/connection"
-        },
+        "connection": true,
         "points": {
           "type": "array",
-          "items": {
-            "$ref": "#/$defs/point"
-          },
           "maxItems": 2000,
           "minItems": 0
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "protocol": {
+                "const": "modbus_tcp"
+              }
+            },
+            "required": [
+              "protocol"
+            ]
+          },
+          "then": {
+            "properties": {
+              "connection": {
+                "$ref": "#/$defs/connection"
+              },
+              "points": {
+                "items": {
+                  "$ref": "#/$defs/point"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "protocol": {
+                "const": "opcua"
+              }
+            },
+            "required": [
+              "protocol"
+            ]
+          },
+          "then": {
+            "properties": {
+              "connection": {
+                "$ref": "#/$defs/opcuaConnection"
+              },
+              "points": {
+                "items": {
+                  "$ref": "#/$defs/opcuaPoint"
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "configSet": {
       "type": "object",

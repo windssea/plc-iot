@@ -17,7 +17,7 @@ docker compose -f deploy/container/compose.yaml up -d
 
 初始化记录保存在持久卷 `/var/lib/plcnext-iot/commissioning.json`，采用同目录临时文件、fsync、原子替换；Linux 文件权限 0600。密码是受文件权限保护的明文，不宣称设备端加密。私有 CA 从该记录恢复为运行时 PEM 文件。初始化进程全程持有独占锁，阻止两个初始化实例同时拥有目录。
 
-保存后自动运行既有采集 Agent。重启直接加载初始化记录，沿用 agent.db 和 telemetry.db。配置损坏时退出报错，不清空或重新认领；发现旧数据库但没有初始化记录时拒绝首次设置，防止给旧采集数据绑定新 PLC 身份。
+保存后自动运行既有采集 Agent，驱动为 `all`（Modbus TCP 与 OPC UA）。重启直接加载初始化记录，沿用 agent.db 和 telemetry.db。配置损坏时退出报错，不清空或重新认领；发现旧数据库但没有初始化记录时拒绝首次设置，防止给旧采集数据绑定新 PLC 身份。页面只配置北向 MQTT；OPC UA 用户名在业务快照中，对应 `passwordEnv` 需由容器环境另行提供。
 
 初始化完成后页面不是通用管理后台，而是一个有边界的维护入口：可查看已保存的 PLC ID 与 Broker 设置，并可修改 Broker 地址、端口、TLS、用户名/密码和私有 CA。**PLC ID 不可修改**：它与设备上的 agent.db、telemetry.db 身份绑定，改动会让采集子系统启动失败，换身份属于单独的数据迁移流程。页面永不返回密码与 CA 内容，只报告"已设置/未设置"；修改前需要一次页面内二次确认。当前仍没有远程重置按钮；不要删除 commissioning.json 后保留数据库并尝试重新初始化。
 

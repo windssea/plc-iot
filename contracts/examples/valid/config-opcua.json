@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "gatewayId": "PLC-01",
+  "timestamp": 1788748123123,
+  "messageId": "cfg-PLC-01-opcua-10",
+  "configVersion": 10,
+  "config": {
+    "enabled": true,
+    "report": {
+      "batchIntervalMs": 1000,
+      "maxBatchPoints": 500
+    },
+    "devices": [
+      {
+        "deviceId": "tank-A",
+        "name": "Tank A",
+        "enabled": true,
+        "protocol": "opcua",
+        "connection": {
+          "host": "192.168.10.102",
+          "port": 4840,
+          "path": "/iot-simulator/",
+          "securityPolicy": "None",
+          "securityMode": "None",
+          "connectTimeoutMs": 3000,
+          "requestTimeoutMs": 1000,
+          "retryCount": 0
+        },
+        "points": [
+          {
+            "pointId": "level",
+            "name": "Level",
+            "enabled": true,
+            "dataType": "float32",
+            "pollIntervalMs": 1000,
+            "scale": 1,
+            "offset": 0,
+            "unit": "m",
+            "reportMode": "change_or_cyclic",
+            "reportIntervalMs": 5000,
+            "deadband": 0.1,
+            "staleAfterMs": 5000,
+            "opcua": {
+              "nodeId": "ns=2;s=tank-A.level"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

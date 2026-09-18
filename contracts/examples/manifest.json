@@ -60,6 +60,11 @@
     "valid": true
   },
   {
+    "file": "valid/config-opcua.json",
+    "kind": "configSet",
+    "valid": true
+  },
+  {
     "file": "valid/data-bad-quality.json",
     "kind": "data",
     "valid": true
@@ -104,6 +109,12 @@
     "kind": "configSet",
     "valid": false,
     "code": "SCHEMA_INVALID"
+  },
+  {
+    "file": "invalid/duplicate-node.json",
+    "kind": "configSet",
+    "valid": false,
+    "code": "DUPLICATE_NODE_ID"
   },
   {
     "file": "invalid/topic-injection.json",

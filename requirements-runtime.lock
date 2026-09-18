@@ -1,9 +1,21 @@
 # Validated Python 3.12 runtime dependency set; wheels must match target ABI/architecture.
+aiosqlite==0.22.1
+anyio==4.15.1
+asyncua==2.0.1
 attrs==26.1.0
+cffi==2.1.1
+cryptography==50.0.1
+idna==3.19
 jsonschema==4.25.1
 jsonschema-specifications==2025.9.1
 paho-mqtt==2.1.0
+pycparser==3.0
 pymodbus==3.13.1
+pyOpenSSL==26.4.0
+python-dateutil==2.9.0.post0
+pytz==2026.3.post1
 referencing==0.37.0
 rpds-py==2026.6.3
+six==1.17.0
+sortedcontainers==2.4.0
 typing_extensions==4.16.0

@@ -4,7 +4,7 @@
   "timestamp": 1788748123123,
   "sessionId": "session-001",
   "bootId": "boot-001",
-  "agentVersion": "0.1.0",
+  "agentVersion": "0.2.0",
   "activeConfigVersion": 10,
   "uptimeSeconds": 60,
   "agentState": "RUNNING",

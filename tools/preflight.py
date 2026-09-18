@@ -23,7 +23,8 @@ def check(bootstrap, mqtt=None, *, require_systemd=False, release_root=None):
     record('sqlite', sqlite3.sqlite_version_info >= (3, 24, 0))
     if require_systemd:
         record('systemd', Path('/run/systemd/system').is_dir() and shutil.which('systemctl'))
-    for name, version in (('jsonschema','4.25.1'), ('pymodbus','3.13.1'), ('paho-mqtt','2.1.0')):
+    for name, version in (('jsonschema','4.25.1'), ('pymodbus','3.13.1'), ('paho-mqtt','2.1.0'),
+                          ('asyncua','2.0.1')):
         try:
             ok = importlib.metadata.version(name) == version
         except importlib.metadata.PackageNotFoundError:
