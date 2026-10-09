@@ -128,6 +128,7 @@ class OpcUaReader:
             enabled = tuple(p for p in self.points if p.enabled)
             period = min((p.poll_interval_ms for p in enabled), default=1000)
             mapping = {}
+            polled = []
             handler = _Handler(mapping, emit, self._lost)
             subscription = await client.create_subscription(period, handler)
             for point in enabled:
@@ -135,9 +136,45 @@ class OpcUaReader:
                 mapping[node.nodeid] = point
                 try:
                     await subscription.subscribe_data_change(node, sampling_interval=point.poll_interval_ms)
+                    polled.append((point, node))
                 except (UaStatusCodeError, UaError, OSError):
                     emit(point, None, 'BAD_PROTOCOL')
-            await self._lost.wait()
+            # DataChange subscriptions do not notify again for a constant value.
+            # A real read at the configured interval keeps freshness tied to the device.
+            loop = asyncio.get_running_loop()
+            next_read = {point.point_id: loop.time() + point.poll_interval_ms / 1000
+                         for point, _node in polled}
+            while not self._lost.is_set():
+                if not polled:
+                    await self._lost.wait()
+                    break
+                due_at = min(next_read.values())
+                try:
+                    await asyncio.wait_for(self._lost.wait(), max(0, due_at - loop.time()))
+                    break
+                except TimeoutError:
+                    pass
+                now = loop.time()
+                for point, node in polled:
+                    if next_read[point.point_id] > now:
+                        continue
+                    next_read[point.point_id] = now + point.poll_interval_ms / 1000
+                    try:
+                        data = await asyncio.wait_for(node.read_data_value(), timeout)
+                        quality = quality_of(data.StatusCode)
+                        value = None
+                        if quality == 'GOOD':
+                            try:
+                                value = decode(point, data.Value.Value)
+                            except (ValueError, TypeError, OverflowError):
+                                quality = 'BAD_DECODE'
+                        emit(point, value, quality)
+                    except TimeoutError:
+                        emit(point, None, 'BAD_TIMEOUT')
+                    except UaStatusCodeError:
+                        emit(point, None, 'BAD_PROTOCOL')
+                    except (OSError, UaError) as exc:
+                        raise ConnectionError('BAD_CONNECTION') from exc
         except TimeoutError as exc:
             raise ConnectionError('BAD_TIMEOUT') from exc
         except asyncio.CancelledError:

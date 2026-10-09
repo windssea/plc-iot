@@ -12,6 +12,7 @@ from plcnext_iot.contracts import validate_message
 from plcnext_iot.devices.factory import DRIVERS, bind
 from plcnext_iot.devices.runtime import DeviceRuntime, UnsupportedDriver
 from plcnext_iot.points.samples import SampleBuffer
+from plcnext_iot.reporting.engine import ReportEngine
 
 
 def load_opcua():
@@ -140,6 +141,44 @@ class OpcUaRuntimeTests(unittest.IsolatedAsyncioTestCase):
         found = await self.collect(samples, lambda s: s.quality == 'GOOD', 2)
         self.assertEqual(found[('tank-A', 'level')].value, 26.0)
         self.assertEqual(found[('tank-A', 'running')].value, True)
+
+    async def test_constant_values_remain_fresh_after_stale_interval(self):
+        payload = self.payload(
+            ('level', 'Level', 'float32', 'tank.level', {}),
+            ('running', 'Running', 'bool', 'tank.running', {}),
+        )
+        runtime, samples = await self.start_agent(payload)
+        await self.collect(samples, lambda s: s.quality == 'GOOD', 2)
+        await asyncio.sleep(1.3)
+        runner = runtime.runners['tank-A']
+        now = asyncio.get_running_loop().time()
+        state, good, total = runner.diagnostics(runtime.snapshot.devices[0], now)
+        self.assertEqual((state['status'], good, total), ('ONLINE', 2, 2))
+        self.assertTrue(all(now - sample.monotonic_time < 0.5
+                            for sample in runner.latest.values()))
+
+    async def test_reused_subscription_refreshes_after_config_version_change(self):
+        payload = self.payload(('level', 'Level', 'float32', 'tank.level', {}))
+        runtime, samples = await self.start_agent(payload)
+        old_runner = runtime.runners['tank-A']
+        report = ReportEngine('PLC-01', 'boot-test')
+        report.configure(runtime.snapshot, asyncio.get_running_loop().time())
+        await self.collect(samples, lambda sample: sample.quality == 'GOOD')
+
+        wire = json.loads(payload)
+        wire['configVersion'] += 1
+        wire['messageId'] = 'cfg-next-version'
+        transition = runtime.prepare(ConfigSnapshot.parse(json.dumps(wire).encode(), 'PLC-01'))
+        await transition.activate()
+        transition.publish()
+        self.assertIs(runtime.runners['tank-A'], old_runner)
+        report.configure(runtime.snapshot, asyncio.get_running_loop().time())
+        async with asyncio.timeout(3):
+            while True:
+                sample = await samples.get()
+                if sample.config_version == wire['configVersion'] and sample.quality == 'GOOD':
+                    break
+        self.assertTrue(report.accept(sample, asyncio.get_running_loop().time()))
 
     async def test_unknown_node_is_protocol_error_and_other_points_continue(self):
         payload = self.payload(
