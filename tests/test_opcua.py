@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 from pathlib import Path
 import socket
 import sys
@@ -179,6 +180,23 @@ class OpcUaRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 if sample.config_version == wire['configVersion'] and sample.quality == 'GOOD':
                     break
         self.assertTrue(report.accept(sample, asyncio.get_running_loop().time()))
+
+    async def test_missing_opcua_password_env_rejects_candidate_before_old_runner_stops(self):
+        payload = self.payload(('level', 'Level', 'float32', 'tank.level', {}))
+        runtime, samples = await self.start_agent(payload)
+        old_runner = runtime.runners['tank-A']
+        await self.collect(samples, lambda sample: sample.quality == 'GOOD')
+        wire = json.loads(payload)
+        wire['configVersion'] += 1
+        wire['messageId'] = 'cfg-missing-secret'
+        wire['config']['devices'][0]['connection'].update(
+            username='iot_client', passwordEnv='IOT_TASK12_MISSING_OPCUA_SECRET')
+        os.environ.pop('IOT_TASK12_MISSING_OPCUA_SECRET', None)
+        with self.assertRaisesRegex(RuntimeError, 'OPCUA_CREDENTIAL_ENV_MISSING'):
+            runtime.prepare(ConfigSnapshot.parse(json.dumps(wire).encode(), 'PLC-01'))
+        self.assertEqual(runtime.snapshot.config_version, wire['configVersion'] - 1)
+        self.assertIs(runtime.runners['tank-A'], old_runner)
+        await self.collect(samples, lambda sample: sample.quality == 'GOOD')
 
     async def test_unknown_node_is_protocol_error_and_other_points_continue(self):
         payload = self.payload(
