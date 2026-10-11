@@ -3,6 +3,7 @@ from dataclasses import dataclass, replace
 import uuid
 
 from plcnext_iot.messaging.messages import encode
+from plcnext_iot.core.boot import ProcessBootContext
 from plcnext_iot.points.samples import Sample
 
 
@@ -16,9 +17,11 @@ class ReportBatch:
 
 
 class ReportEngine:
-    def __init__(self,gateway,boot_id):
+    def __init__(self,gateway,boot_id,*,boot_context=None):
         self.gateway,self.boot_id=gateway,boot_id
-        self.sequence=0
+        self.boot_context=boot_context if boot_context is not None else ProcessBootContext(boot_id)
+        if self.boot_context.boot_id!=boot_id:
+            raise ValueError('Report engine boot identity does not match its process context')
         self.snapshot=None
         self.points={}
         self.latest={}
@@ -28,6 +31,10 @@ class ReportEngine:
         self.next_batch=0
         self.discarded=0
         self.cache_reset_points=0
+
+    @property
+    def sequence(self):
+        return self.boot_context.sequence
 
     def configure(self,snapshot,now):
         if snapshot is self.snapshot or snapshot==self.snapshot:
@@ -88,11 +95,11 @@ class ReportEngine:
         def flush():
             if not pending:
                 return
-            self.sequence+=1
+            sequence=self.boot_context.next_sequence()
             values=[{'deviceId':s.device_id,'pointId':s.point_id,'timestamp':s.timestamp,
                      'value':s.value if s.quality=='GOOD' else None,'quality':s.quality} for s in pending]
             payload=encode({'schemaVersion':1,'gatewayId':self.gateway,'timestamp':wall_ms,
-                'messageId':'batch-'+uuid.uuid4().hex,'bootId':self.boot_id,'sequence':self.sequence,
+                'messageId':'batch-'+uuid.uuid4().hex,'bootId':self.boot_id,'sequence':sequence,
                 'configVersion':self.snapshot.config_version,'values':values})
             if len(payload)>131072:
                 raise ValueError('Telemetry batch exceeds byte limit')

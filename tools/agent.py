@@ -10,6 +10,7 @@ import signal
 from tools import _source_path  # noqa: F401
 from plcnext_iot.core.lifecycle import AgentLifecycle, LifecycleError
 from plcnext_iot.core.settings import AgentSettings
+from plcnext_iot.core.boot import ProcessBootContext
 from plcnext_iot.devices.factory import DRIVERS, bind
 from plcnext_iot.devices.runtime import DeviceRuntime
 from plcnext_iot.config.store import StoreError
@@ -21,7 +22,10 @@ def _emit(event, agent, **fields):
 
 
 async def run(settings, configs, run_seconds, driver='none', mqtt_settings=None, quiet_samples=False,
-              stop_event=None, boot_id=None):
+              stop_event=None, boot_id=None, *, boot_context=None):
+    context = boot_context if boot_context is not None else ProcessBootContext(boot_id)
+    if boot_id is not None and boot_id != context.boot_id:
+        raise ValueError('Agent boot identity does not match its process context')
     from plcnext_iot.points.samples import SampleBuffer
     samples = SampleBuffer()
     if driver == 'none':
@@ -49,7 +53,7 @@ async def run(settings, configs, run_seconds, driver='none', mqtt_settings=None,
             from plcnext_iot.messaging.config_service import MqttConfigService
             from plcnext_iot.reporting.service import TelemetryPipeline
             telemetry=TelemetryPipeline(runtime,samples,settings.data_directory,settings.gateway_id,
-                boot_id=boot_id,
+                boot_id=context.boot_id,boot_context=context,
                 on_sample=None if quiet_samples else lambda sample: _emit('sample',agent,sample=asdict(sample),droppedSamples=samples.dropped))
             await telemetry.start()
             mqtt_service = MqttConfigService(agent,mqtt_settings,telemetry=telemetry)

@@ -1,19 +1,22 @@
 """Owned sample consumer and durable transport adapter; one DB worker thread."""
 import asyncio
 import time
-import uuid
 
 from plcnext_iot.core.storage_worker import StoreWorker
+from plcnext_iot.core.boot import ProcessBootContext
 from plcnext_iot.reporting.engine import ReportEngine
 from plcnext_iot.storage.outbox import OutboxStore
 
 
 class TelemetryPipeline:
-    def __init__(self,runtime,samples,directory,gateway,*,on_sample=None,store_factory=None,boot_id=None):
+    def __init__(self,runtime,samples,directory,gateway,*,on_sample=None,store_factory=None,boot_id=None,boot_context=None):
         self.runtime,self.samples=runtime,samples
-        # A reload inside one process keeps the boot identity: receivers treat a
-        # new bootId as a controller restart, and the sequence would restart too.
-        self.engine=ReportEngine(gateway,boot_id or 'boot-'+uuid.uuid4().hex)
+        # The supervisor owns a boot's counters; each run still owns fresh policy
+        # caches. An independent pipeline defaults to a fresh process identity.
+        context=boot_context if boot_context is not None else ProcessBootContext(boot_id)
+        if boot_id is not None and boot_id!=context.boot_id:
+            raise ValueError('Telemetry boot identity does not match its process context')
+        self.engine=ReportEngine(gateway,context.boot_id,boot_context=context)
         self.storage=StoreWorker(directory/'telemetry.db',gateway,store_factory or OutboxStore)
         self.on_sample=on_sample
         self.last_error=None

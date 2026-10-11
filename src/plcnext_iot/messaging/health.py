@@ -1,16 +1,20 @@
 """Current device state and non-retained heartbeat, independent of config ingress."""
 import asyncio
 import time
-import uuid
 
 from plcnext_iot.messaging.messages import encode
+from plcnext_iot.core.boot import ProcessBootContext
 
 
 class HealthPublisher:
-    def __init__(self, agent, telemetry=None):
+    def __init__(self, agent, telemetry=None, *, boot_context=None):
         self.agent, self.telemetry = agent, telemetry
-        self.boot_id = telemetry.engine.boot_id if telemetry else 'boot-' + uuid.uuid4().hex
-        self.started = time.monotonic()
+        context = telemetry.engine.boot_context if telemetry else boot_context
+        if telemetry is not None and boot_context is not None and context is not boot_context:
+            raise ValueError('Health and telemetry must use the same process boot context')
+        self.boot_context = context if context is not None else ProcessBootContext()
+        self.boot_id = self.boot_context.boot_id
+        self.started = self.boot_context.started_at
 
     def snapshot(self, session_id, queue, now=None, timestamp=None):
         now = time.monotonic() if now is None else now

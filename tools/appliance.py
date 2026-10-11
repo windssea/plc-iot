@@ -10,11 +10,11 @@ import json
 from pathlib import Path
 import signal
 import ssl
-import uuid
 
 from tools import _source_path  # noqa: F401
 from tools.agent import run
 from plcnext_iot.config.locking import StoreLock
+from plcnext_iot.core.boot import ProcessBootContext
 from plcnext_iot.provisioning.store import SetupStore
 from plcnext_iot.provisioning.server import SetupServer
 
@@ -42,7 +42,7 @@ async def _supervise(store, server, stop):
     anything, so a deterministic startup failure still ends the process (leaving
     the restart decision to the container's supervisor) instead of spinning.
     """
-    boot_id = 'boot-' + uuid.uuid4().hex
+    boot_context = ProcessBootContext()
     while True:
         value = server.value
         if value is None:
@@ -65,7 +65,8 @@ async def _supervise(store, server, stop):
         run_stop = asyncio.Event()
         watcher = asyncio.create_task(_watch_reload(stop, server, seq, run_stop), name='iot-reload-watch')
         try:
-            code = await run(settings, [], None, 'all', mqtt, True, run_stop, boot_id)
+            code = await run(settings, [], None, 'all', mqtt, True, run_stop,
+                             boot_context.boot_id, boot_context=boot_context)
         finally:
             watcher.cancel()
             await asyncio.gather(watcher, return_exceptions=True)
