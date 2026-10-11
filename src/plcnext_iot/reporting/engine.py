@@ -11,6 +11,8 @@ class ReportBatch:
     payload: bytes
     version: int
     samples: tuple[Sample, ...]
+    # Internal policy clock only; never part of the encoded/durable payload.
+    prepared_at: float
 
 
 class ReportEngine:
@@ -94,7 +96,7 @@ class ReportEngine:
                 'configVersion':self.snapshot.config_version,'values':values})
             if len(payload)>131072:
                 raise ValueError('Telemetry batch exceeds byte limit')
-            batches.append(ReportBatch(payload,self.snapshot.config_version,tuple(pending)))
+            batches.append(ReportBatch(payload,self.snapshot.config_version,tuple(pending),now))
         for sample in selected:
             value={'deviceId':sample.device_id,'pointId':sample.point_id,'timestamp':sample.timestamp,
                    'value':sample.value if sample.quality=='GOOD' else None,'quality':sample.quality}
@@ -109,7 +111,12 @@ class ReportEngine:
         return batches
 
     def committed(self,batch,now):
+        """Advance only after durable enqueue, anchored to the selected cycle.
+
+        ``now`` is retained for caller compatibility but is not used to compute
+        the policy deadline. Persistence latency must not shift the next cycle.
+        """
         if self.snapshot is None or batch.version!=self.snapshot.config_version:
             return
         for sample in batch.samples:
-            self.baselines[(sample.device_id,sample.point_id)]=(sample,now)
+            self.baselines[(sample.device_id,sample.point_id)]=(sample,batch.prepared_at)
