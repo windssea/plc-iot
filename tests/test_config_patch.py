@@ -383,6 +383,60 @@ class PatchLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(result.applied_config_version)
         self.assertEqual(self.agent.active_message_id, 'full-10')
 
+    async def test_batch_commit_failure_restores_all_changed_runners_and_exact_retry_keeps_peer(self):
+        initial = full(11)
+        peer_config = copy.deepcopy(initial['config']['devices'][0])
+        peer_config.update(deviceId='meter-C', name='Unselected meter C')
+        initial['config']['devices'].append(peer_config)
+        self.assertEqual((await self.agent.submit(raw(initial))).status, 'APPLIED')
+        before = self.runtime.snapshot
+        old_a, old_b, peer = (self.runtime.runners[key] for key in ('meter-A', 'meter-B', 'meter-C'))
+        value = command(12, 11)
+        value['operations'].append(command(12, 11, device_id='meter-B')['operations'][0])
+        payload = raw(value)
+        with closing(sqlite3.connect(self.directory/'agent.db')) as conn:
+            conn.execute("""CREATE TRIGGER refuse_batch_activation BEFORE UPDATE OF active_version ON metadata
+                            BEGIN SELECT RAISE(ABORT,'external commit fault'); END""")
+            conn.commit()
+        try:
+            result = await self.agent.submit(payload, kind='configPatch')
+            self.assertEqual((result.status, result.code, result.applied_config_version),
+                             ('FAILED', 'STORAGE_ERROR', None))
+            self.assertEqual((result.active_config_version, result.active_message_id), (11, 'full-11'))
+            self.assertEqual(self.agent.state, 'RUNNING')
+            self.assertIs(self.runtime.snapshot, before)
+            self.assertIs(self.runtime.runners['meter-A'], old_a)
+            self.assertIs(self.runtime.runners['meter-B'], old_b)
+            self.assertIs(self.runtime.runners['meter-C'], peer)
+            self.assertEqual((old_a.starts, old_a.stops, old_b.starts, old_b.stops), (2, 2, 2, 2))
+            self.assertEqual((peer.starts, peer.stops), (1, 0))
+            self.assertTrue(all(runner.task is None for runner in self.created[-2:]))
+            stored = await self.agent._storage.call('load_active')
+            self.assertEqual(stored.content_hash, before.content_hash)
+            with closing(sqlite3.connect(self.directory/'agent.db')) as conn:
+                self.assertEqual(conn.execute('SELECT active_version FROM metadata').fetchone()[0], 11)
+                self.assertEqual(conn.execute('SELECT status FROM requests WHERE message_id=?',
+                                              (value['messageId'],)).fetchone()[0], 'FAILED')
+        finally:
+            with closing(sqlite3.connect(self.directory/'agent.db')) as conn:
+                conn.execute('DROP TRIGGER refuse_batch_activation')
+                conn.commit()
+        result = await self.agent.submit(payload, kind='configPatch')
+        self.assertEqual((result.status, result.applied_config_version, result.active_message_id),
+                         ('APPLIED', 12, 'patch-12'))
+        self.assertIsNot(self.runtime.runners['meter-A'], old_a)
+        self.assertIsNot(self.runtime.runners['meter-B'], old_b)
+        self.assertIs(self.runtime.runners['meter-C'], peer)
+        self.assertEqual((peer.starts, peer.stops), (1, 0))
+        self.assertEqual(next(d for d in self.runtime.snapshot.devices if d.device_id == 'meter-C'),
+                         next(d for d in before.devices if d.device_id == 'meter-C'))
+        current = tuple(self.runtime.runners.items())
+        self.assertEqual((await self.agent.submit(payload, kind='configPatch')).status, 'APPLIED')
+        self.assertEqual(tuple(self.runtime.runners.items()), current)
+        with closing(sqlite3.connect(self.directory/'agent.db')) as conn:
+            self.assertEqual(conn.execute('SELECT status FROM requests WHERE message_id=?',
+                                          (value['messageId'],)).fetchone()[0], 'APPLIED')
+
     async def test_historical_retry_after_restart_is_applied_with_current_runtime_unmodified(self):
         payload = raw(command())
         await self.agent.submit(payload, kind='configPatch')
