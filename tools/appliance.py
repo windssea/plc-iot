@@ -65,9 +65,13 @@ async def _supervise(store, server, stop):
         run_stop = asyncio.Event()
         watcher = asyncio.create_task(_watch_reload(stop, server, seq, run_stop), name='iot-reload-watch')
         try:
+            observer = getattr(server, 'set_runtime', None)
             code = await run(settings, [], None, 'all', mqtt, True, run_stop,
-                             boot_context.boot_id, boot_context=boot_context)
+                             boot_context.boot_id, boot_context=boot_context,
+                             **({'runtime_observer': observer} if observer is not None else {}))
         finally:
+            if observer is not None:
+                observer(None)
             watcher.cancel()
             await asyncio.gather(watcher, return_exceptions=True)
         if stop.is_set() or server.change_seq == seq:

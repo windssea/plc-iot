@@ -16,6 +16,7 @@ from urllib.parse import unquote, urlsplit, parse_qs
 from plcnext_iot.messaging.transport import PahoConnection
 from plcnext_iot.provisioning.store import SettingsError, parse, parse_update
 from plcnext_iot.provisioning.devices import ConfigUnavailable, read_active, metadata, summary, detail
+from plcnext_iot.provisioning.samples import read_samples
 
 
 CONFLICT_CODES = ('IDENTITY_IMMUTABLE', 'NOT_CONFIGURED')
@@ -36,11 +37,18 @@ class SetupServer:
         self._slots = asyncio.Semaphore(16)
         self._clients = set()
         self.server = None
+        # One borrowed lifecycle pointer; its runners already own latest values.
+        self._runtime_agent = None
+
+    def set_runtime(self, agent):
+        """Called synchronously on this loop at agent start/end, never per sample."""
+        self._runtime_agent = agent
 
     async def start(self, host, port, ssl=None):
         self.server = await asyncio.start_server(self.handle, host, port, limit=32768, ssl=ssl)
 
     async def close(self):
+        self.set_runtime(None)
         self.server.close()
         for task in tuple(self._clients):
             task.cancel()
@@ -106,6 +114,29 @@ class SetupServer:
         result['device'] = detail(device)
         return 200, None, result
 
+    def _samples(self, path):
+        parts = urlsplit(path)
+        encoded = parts.path[len('/api/devices/'):-len('/samples')]
+        if re.search(r'%(?![0-9A-Fa-f]{2})', encoded):
+            return 404, None, dict(code='NOT_FOUND')
+        try:
+            device_id = unquote(encoded, errors='strict')
+        except UnicodeError:
+            return 404, None, dict(code='NOT_FOUND')
+        if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}', device_id):
+            return 404, None, dict(code='NOT_FOUND')
+        query = parse_qs(parts.query, keep_blank_values=True)
+        if (parts.fragment or set(query) != {'configVersion'}
+                or len(query['configVersion']) != 1
+                or not re.fullmatch(r'[1-9][0-9]{0,15}', query['configVersion'][0])):
+            return 400, None, dict(code='INVALID_REQUEST')
+        gateway_id = self.value['gatewayId'] if self.value is not None else None
+        # This call intentionally contains no await: snapshot/version/runners
+        # are observed in one owning-loop turn, with zero SQLite/southbound I/O.
+        code, result = read_samples(self._runtime_agent, gateway_id, device_id,
+                                    int(query['configVersion'][0]), asyncio.get_running_loop().time())
+        return code, None, result
+
     async def route(self, method, path, headers, body):
         if method == 'GET' and path == '/':
             return 200, 'text/html; charset=utf-8', (Path(__file__).parent/'web/index.html').read_bytes()
@@ -118,6 +149,9 @@ class SetupServer:
                                    changeSeq=self.change_seq, appliedSeq=self.applied_seq)
         if method == 'GET' and path == '/api/config':
             return 200, None, self._public()
+        if (method == 'GET' and path.startswith('/api/devices/')
+                and re.fullmatch(r'/api/devices/[^/]+/samples', urlsplit(path).path)):
+            return self._samples(path)
         if method == 'GET' and (path == '/api/devices' or path.startswith('/api/devices/')
                                 or path.startswith('/api/devices?')):
             return await self._devices(path)

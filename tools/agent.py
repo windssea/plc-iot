@@ -22,7 +22,8 @@ def _emit(event, agent, **fields):
 
 
 async def run(settings, configs, run_seconds, driver='none', mqtt_settings=None, quiet_samples=False,
-              stop_event=None, boot_id=None, *, boot_context=None):
+              stop_event=None, boot_id=None, *, boot_context=None, runtime_observer=None):
+    """Optionally lend the lifecycle to a same-loop Web reader for this run only."""
     context = boot_context if boot_context is not None else ProcessBootContext(boot_id)
     if boot_id is not None and boot_id != context.boot_id:
         raise ValueError('Agent boot identity does not match its process context')
@@ -48,6 +49,8 @@ async def run(settings, configs, run_seconds, driver='none', mqtt_settings=None,
         previous[sig] = signal.signal(sig, lambda *_args: loop.call_soon_threadsafe(stop.set))
     code = 0
     try:
+        if runtime_observer is not None:
+            runtime_observer(agent)
         await agent.start()
         if mqtt_settings is not None:
             from plcnext_iot.messaging.config_service import MqttConfigService
@@ -99,6 +102,8 @@ async def run(settings, configs, run_seconds, driver='none', mqtt_settings=None,
         _emit('storage_failed',agent,code='TELEMETRY_STORAGE_ERROR')
         code=1
     finally:
+        if runtime_observer is not None:
+            runtime_observer(None)
         try:
             try:
                 if mqtt_service is not None:
