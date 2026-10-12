@@ -177,6 +177,7 @@ function viewDevices(){
   showDeviceList();
 }
 async function showDeviceList(){
+  stopSamples();
   selectedDeviceId=null;
   const request=++deviceRequest;
   $('#devicesTitle').textContent='设备列表';$('#deviceList').hidden=false;$('#deviceDetail').hidden=true;
@@ -225,6 +226,7 @@ function renderDeviceDetail(device){
   body.replaceChildren(...nodes);
 }
 async function showDeviceDetail(deviceId){
+  stopSamples();
   const expectedVersion=deviceMeta&&deviceMeta.configVersion;
   const request=++deviceRequest;selectedDeviceId=deviceId;
   $('#devicesTitle').textContent='设备配置详情';$('#deviceList').hidden=true;$('#deviceDetail').hidden=false;
@@ -234,7 +236,7 @@ async function showDeviceDetail(deviceId){
     const data=await collectionLoad('/api/devices/'+encodeURIComponent(deviceId)+'?configVersion='+expectedVersion);
     if(!deviceView||request!==deviceRequest)return;
     if(data.configVersion!==expectedVersion){deviceState('配置已更新，请返回设备列表刷新后查看详情。',true);return;}
-    collectionMeta(data);renderDeviceDetail(data.device);
+    collectionMeta(data);renderDeviceDetail(data.device);startSamples(data);
     deviceState('以下设备和点位均来自本地保存的 v'+data.configVersion+' 配置。');
   }catch(error){if(deviceView&&request===deviceRequest)deviceState(error.status===409?
     '配置已更新，请返回设备列表刷新后查看详情。':error.status===404?'当前配置中已没有此设备。请返回设备列表查看最新配置。':'无法读取设备详情，请点击“刷新配置”重试。',true);}
@@ -243,7 +245,7 @@ async function showDeviceDetail(deviceId){
 $('#devicesView').addEventListener('click',viewDevices);
 $('#platformView').addEventListener('click',async()=>{
   if(busy)return;
-  deviceView=false;++deviceRequest;++pageEpoch;selectedDeviceId=null;
+  stopSamples();deviceView=false;++deviceRequest;++pageEpoch;selectedDeviceId=null;
   document.querySelector('main').classList.remove('devices-view');$('#devicesPanel').hidden=true;
   $('#devicesView').setAttribute('aria-pressed','false');$('#platformView').setAttribute('aria-pressed','true');
   loading.hidden=false;loading.textContent='正在读取设备状态…';summary.hidden=true;form.hidden=true;
@@ -251,3 +253,134 @@ $('#platformView').addEventListener('click',async()=>{
 });
 $('#backDevices').addEventListener('click',showDeviceList);
 $('#refreshDevices').addEventListener('click',()=>selectedDeviceId===null?showDeviceList():showDeviceDetail(selectedDeviceId));
+
+// Read an existing, bounded runtime snapshot; never start collection or re-read
+// the configuration database. There is one request and one next-refresh timer.
+const SAMPLE_INTERVAL_MS=5000, SAMPLE_TIMEOUT_MS=5000;
+let samples=null, samplesEpoch=0, pageActive=true;
+function setText(target,value){if(target.textContent!==value)target.textContent=value;}
+function sampleStatus(text,error=false){
+  const status=$('#samplesStatus'),className=error?'error':'';
+  setText(status,text);if(status.className!==className)status.className=className;
+}
+function cancelSampleWork(view){
+  if(!view)return;
+  if(view.timer!==null){clearTimeout(view.timer);view.timer=null;}
+  if(view.timeout!==null){clearTimeout(view.timeout);view.timeout=null;}
+  if(view.controller){view.controller.abort();view.controller=null;}
+}
+function stopSamples(){
+  ++samplesEpoch;cancelSampleWork(samples);samples=null;
+  $('#liveSamples').hidden=true;$('#refreshSamples').disabled=false;
+}
+function sampleViewActive(view){return samples===view&&view.epoch===samplesEpoch&&deviceView&&selectedDeviceId===view.deviceId&&!document.hidden&&pageActive&&!view.blocked;}
+function clearSampleValues(view,quality){
+  for(const row of view.rows.values()){
+    setText(row.value,'—');setText(row.time,'—');setText(row.quality,quality);
+    sampleRawTitle(row,'');
+    if(row.quality.className!=='sample-quality unknown')row.quality.className='sample-quality unknown';
+  }
+}
+function startSamples(data){
+  const rows=new Map(),entries=[];
+  for(const point of data.device.points){
+    const row=node('tr'),name=node('td',point.name||point.pointId),value=node('td','—'),time=node('td','—'),quality=node('td','尚无采样','sample-quality unknown');
+    name.append(node('small',point.pointId));row.append(name,value,time,quality);entries.push(row);
+    rows.set(point.pointId,{point,value,time,quality});
+  }
+  $('#samplesBody').replaceChildren(...entries);$('#liveSamples').hidden=false;
+  $('#samplesEmpty').hidden=entries.length>0;
+  samples={epoch:samplesEpoch,deviceId:data.device.deviceId,gatewayId:data.gatewayId,version:data.configVersion,
+    enabled:data.enabled===true&&data.device.enabled===true,rows,timer:null,timeout:null,controller:null,blocked:false};
+  if(entries.length&&(!samples.enabled||data.device.points.every(point=>point.enabled!==true))){
+    paintSamples(samples,{points:[]});samples.blocked=true;$('#refreshSamples').disabled=true;
+    sampleStatus('采集已停用，不读取实时采样。启用并下发新配置后，请返回设备列表刷新。');return;
+  }
+  sampleStatus(entries.length?'正在读取终端实时采样…':'该设备没有采集点位。');
+  if(entries.length&&sampleViewActive(samples))return refreshSamples();
+}
+function sampleTime(timestamp){
+  if(typeof timestamp!=='number'||!Number.isFinite(timestamp)||timestamp<=0)return '—';
+  const date=new Date(timestamp);
+  return Number.isNaN(date.getTime())?'—':date.toLocaleString('zh-CN',{hour12:false})+'.'+String(date.getMilliseconds()).padStart(3,'0');
+}
+function sampleValue(value,point){
+  // Display precision follows the configured source type; the API value stays
+  // untouched and remains available in the cell's tooltip.
+  return typeof value==='number'&&Number.isFinite(value)
+    ?String(Number(value.toPrecision(point.dataType==='float32'?7:12))):String(value);
+}
+function sampleRawTitle(row,raw){
+  if(row.rawText!==raw){row.value.setAttribute('title',raw?'原始值：'+raw:'');row.rawText=raw;}
+}
+function paintSamples(view,data){
+  const points=new Map();
+  for(const sample of data.points){
+    if(!sample||typeof sample.pointId!=='string'||points.has(sample.pointId))throw Error('INVALID_SAMPLES');
+    points.set(sample.pointId,sample);
+  }
+  for(const [pointId,row] of view.rows){
+    const sample=points.get(pointId),disabled=!view.enabled||row.point.enabled!==true;
+    const quality=disabled?'DISABLED':sample&&typeof sample.quality==='string'?sample.quality:'UNKNOWN';
+    const labels={GOOD:'良好',UNKNOWN:'尚无采样',DISABLED:'已停用',STALE:'陈旧'};
+    const label=labels[quality]||(quality.startsWith('BAD_')?'异常（'+quality+'）':'未知（'+quality+'）');
+    const hasValue=quality==='GOOD'&&sample&&sample.value!==undefined&&sample.value!==null;
+    const value=hasValue?sampleValue(sample.value,row.point)+(row.point.unit?' '+row.point.unit:''):'—';
+    sampleRawTitle(row,hasValue?String(sample.value):'');
+    setText(row.value,value);setText(row.time,disabled?'—':sampleTime(sample&&sample.timestamp));setText(row.quality,label);
+    const color=quality==='GOOD'?'good':quality==='STALE'?'stale':quality.startsWith('BAD_')?'bad':'unknown';
+    const className='sample-quality '+color;if(row.quality.className!==className)row.quality.className=className;
+  }
+}
+async function refreshSamples(){
+  const view=samples;
+  if(!view||!view.rows.size||!sampleViewActive(view)||view.controller)return;
+  if(view.timer!==null){clearTimeout(view.timer);view.timer=null;}
+  const controller=new AbortController();view.controller=controller;$('#refreshSamples').disabled=true;
+  let timeout;
+  try{
+    const data=await Promise.race([
+      (async()=>{
+        const response=await fetch('/api/devices/'+encodeURIComponent(view.deviceId)+'/samples?configVersion='+view.version,{cache:'no-store',signal:controller.signal});
+        if(!response.ok){const error=Error();error.status=response.status;throw error;}
+        return response.json();
+      })(),
+      new Promise((_,reject)=>{timeout=setTimeout(()=>{controller.abort();reject(Error('SAMPLE_TIMEOUT'));},SAMPLE_TIMEOUT_MS);view.timeout=timeout;})
+    ]);
+    if(!sampleViewActive(view)||view.controller!==controller)return;
+    if(data.configVersion!==view.version||data.deviceId!==view.deviceId||data.gatewayId!==view.gatewayId){const error=Error();error.status=409;throw error;}
+    if(!Array.isArray(data.points))throw Error('INVALID_SAMPLES');
+    paintSamples(view,data);
+    sampleStatus('最近读取：'+sampleTime(Date.now())+' · 下表时间是实际采集时间。'+($('#autoSamples').checked?' 每次请求完成后间隔 5 秒刷新。':' 自动刷新已暂停。'));
+  }catch(error){
+    if(!sampleViewActive(view)||view.controller!==controller)return;
+    clearSampleValues(view,'读取失败');
+    if(error.status===409||error.status===404){
+      view.blocked=true;sampleStatus(error.status===409?'配置已更新，请返回设备列表刷新后查看实时采样。':'此设备已从配置中移除，请返回设备列表刷新。',true);
+    }else sampleStatus('无法读取实时采样，当前值已清空。可手动重试；自动刷新开启时会稍后重试。',true);
+  }finally{
+    clearTimeout(timeout);
+    if(view.controller===controller){
+      view.controller=null;view.timeout=null;
+      if(samples!==view)return;
+      $('#refreshSamples').disabled=view.blocked;
+      if(sampleViewActive(view)&&$('#autoSamples').checked)view.timer=setTimeout(refreshSamples,SAMPLE_INTERVAL_MS);
+    }
+  }
+}
+$('#refreshSamples').addEventListener('click',refreshSamples);
+$('#autoSamples').addEventListener('change',()=>{
+  if(!samples||samples.blocked)return;
+  cancelSampleWork(samples);$('#refreshSamples').disabled=false;
+  if($('#autoSamples').checked&&sampleViewActive(samples))refreshSamples();
+  else sampleStatus('自动刷新已暂停，可点击“刷新采样”读取。');
+});
+function suspendSamples(){cancelSampleWork(samples);$('#refreshSamples').disabled=false;}
+if(document.addEventListener)document.addEventListener('visibilitychange',()=>{
+  if(document.hidden)suspendSamples();
+  else if(samples&&$('#autoSamples').checked)refreshSamples();
+});
+if(typeof window!=='undefined'&&window.addEventListener){
+  window.addEventListener('pagehide',()=>{pageActive=false;suspendSamples();});
+  window.addEventListener('pageshow',()=>{pageActive=true;if(samples&&$('#autoSamples').checked)refreshSamples();});
+}

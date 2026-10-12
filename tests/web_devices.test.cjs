@@ -37,7 +37,7 @@ async function harness(){
     ['/api/devices/meter%2FA%3FB?configVersion=12',()=>detail]
   ]);
   const calls=[];
-  const context=vm.createContext({document:{querySelector:selector=>{if(!elements[selector])throw Error('Missing element '+selector);return elements[selector];},createElement:tag=>new Element(tag)},setTimeout,fetch:async(url,options)=>{
+  const context=vm.createContext({document:{querySelector:selector=>{if(!elements[selector])throw Error('Missing element '+selector);return elements[selector];},createElement:tag=>new Element(tag)},setTimeout,clearTimeout,AbortController,fetch:async(url,options)=>{
     calls.push({url,options});
     assert.ok(!options.method||options.method==='GET','device views must not write configuration');
     const handler=routes.get(url);if(!handler)throw Error('Unexpected route '+url);
@@ -54,7 +54,7 @@ test('device list retains malicious names as literal text and opens encoded vers
   assert.match(card.textContent,/Modbus TCP/);assert.match(card.textContent,/已停用/);
   h.routes.set('/api/devices/meter%2FA%3FB?configVersion=12',()=>({...detail,device:{...device,points:device.points.map(point=>({...point,reportMode:'change'}))}}));
   await card.children[0].children[1].listeners.click();
-  assert.equal(h.calls.at(-1).url,'/api/devices/meter%2FA%3FB?configVersion=12');
+  assert.ok(h.calls.some(call=>call.url==='/api/devices/meter%2FA%3FB?configVersion=12'));
   const text=h.elements['#deviceDetailBody'].textContent;
   for(const value of ['192.168.10.101','Unit ID','uint16','保持寄存器','AB','0.1','Voltage','5000 ms'])assert.ok(text.includes(value),value);
   assert.ok(text.includes('变化上报'));

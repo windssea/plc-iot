@@ -23,7 +23,7 @@
 - [批量采集与运行诊断说明](doc/批量采集与运行诊断说明.md)：读取计划、并发上限、设备状态和心跳。
 - [PLCnext Linux 部署说明](doc/PLCnextLinux部署说明.md)：发布、安装、预检、升级和服务管理。
 - [多架构容器镜像说明](doc/多架构容器镜像说明.md)：AMD64、ARM64、ARMv7 镜像构建、离线导入与持久卷。
-- [本地初始化与 PLCnext App 部署](doc/本地初始化与PLCnextApp部署.md)：浏览器首次设置、Broker 维护、已下发设备与点位配置查看、自动保存与 WBM 安装路线。
+- [本地初始化与 PLCnext App 部署](doc/本地初始化与PLCnextApp部署.md)：浏览器首次设置、Broker 维护、已下发设备与点位配置、低开销实时采样展示、自动保存与 WBM 安装路线。
 - [WBM 安装包说明](doc/WBM安装包说明.md)：2152 / vPLC 两份未签名开发包、重建和设备验收步骤。
 - [闭环联调测试方案](doc/闭环联调测试方案.md) / [测试报告](doc/闭环联调测试报告.md)：四台模拟子设备的配置、采集、状态与异常恢复。
 - `contracts/v1/`：JSON Schema 和 Topic 元数据。
