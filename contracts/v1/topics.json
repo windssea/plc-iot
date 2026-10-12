@@ -81,6 +81,24 @@
       "retain": false,
       "maxPayloadBytes": 131072,
       "schema": "protocol.schema.json#/$defs/event"
+    },
+    {
+      "kind": "configPatch",
+      "suffix": "config/patch",
+      "direction": "to_agent",
+      "qos": 1,
+      "retain": false,
+      "maxPayloadBytes": 2097152,
+      "schema": "protocol.schema.json#/$defs/configPatch"
+    },
+    {
+      "kind": "configPatchAck",
+      "suffix": "config/patch/ack",
+      "direction": "from_agent",
+      "qos": 1,
+      "retain": false,
+      "maxPayloadBytes": 131072,
+      "schema": "protocol.schema.json#/$defs/configPatchAck"
     }
   ]
 }

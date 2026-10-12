@@ -71,9 +71,36 @@ def config_ack(payload, result, gateway):
     return None if validate_message('configAck',wire,expected_gateway_id=gateway) else wire
 
 
-def config_get(gateway, version, session):
+def config_patch_ack(payload, result, gateway):
+    request = identity(payload, gateway)
+    if request is None or result.active_config_version is None:
+        return None
+    message_id, version = request
+    known = {'SCHEMA_INVALID','INVALID_JSON','PAYLOAD_TOO_LARGE','GATEWAY_MISMATCH',
+             'DUPLICATE_DEVICE_ID','DUPLICATE_POINT_ID','DUPLICATE_NODE_ID','INVALID_ADDRESS',
+             'INVALID_STALE_INTERVAL','POINT_LIMIT_EXCEEDED','VERSION_CONFLICT','STALE_VERSION',
+             'RESOURCE_LIMIT','STORAGE_ERROR','APPLY_FAILED','BASE_CONFIG_MISMATCH',
+             'DEVICE_EXISTS','DEVICE_NOT_FOUND','OPERATION_CONFLICT'}
+    def error(code, path=''):
+        code = 'VERSION_CONFLICT' if code == 'MESSAGE_ID_CONFLICT' else code
+        code = 'OPERATION_CONFLICT' if code == 'RETAINED_PATCH' else code
+        return dict(code=code if code in known else 'APPLY_FAILED',
+                    path=path[:512] if path.startswith('/') else '',
+                    message='Device command could not be applied.')
+    errors = [] if result.status == 'APPLIED' else (
+        [error(issue.code, issue.path) for issue in result.issues[:32]] or [error(result.code)])
+    wire = encode(dict(_base(gateway), messageId=message_id, configVersion=version,
+                       appliedConfigVersion=result.applied_config_version,
+                       activeConfigVersion=result.active_config_version,
+                       activeMessageId=result.active_message_id, status=result.status, errors=errors))
+    return None if validate_message('configPatchAck', wire, expected_gateway_id=gateway) else wire
+
+
+def config_get(gateway, version, session, *, active_message_id=None, capabilities=False):
+    extras = (dict(configCapabilities=['devicePatchV1'], activeMessageId=active_message_id)
+              if capabilities else {})
     return encode(dict(_base(gateway),messageId='get-' + uuid.uuid4().hex,
-                       activeConfigVersion=version,sessionId=session))
+                       activeConfigVersion=version,sessionId=session, **extras))
 
 
 def status(gateway, session, online, reason):

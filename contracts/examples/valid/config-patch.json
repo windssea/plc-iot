@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "gatewayId": "PLC-01",
+  "timestamp": 1788748123123,
+  "messageId": "patch-PLC-01-11",
+  "configVersion": 11,
+  "baseConfigVersion": 10,
+  "baseMessageId": "cfg-PLC-01-10",
+  "operations": [
+    {
+      "op": "replace",
+      "deviceId": "meter-A",
+      "device": {
+        "deviceId": "meter-A",
+        "name": "Meter A revised",
+        "enabled": true,
+        "protocol": "modbus_tcp",
+        "connection": {
+          "host": "192.168.10.101",
+          "port": 502,
+          "unitId": 1,
+          "connectTimeoutMs": 3000,
+          "requestTimeoutMs": 1000,
+          "retryCount": 0
+        },
+        "points": [
+          {
+            "pointId": "voltage",
+            "name": "Voltage",
+            "enabled": true,
+            "dataType": "uint16",
+            "pollIntervalMs": 1000,
+            "scale": 0.1,
+            "offset": 0,
+            "unit": "V",
+            "reportMode": "change_or_cyclic",
+            "reportIntervalMs": 5000,
+            "deadband": 0.1,
+            "staleAfterMs": 5000,
+            "modbus": {
+              "area": "holding_register",
+              "address": 0,
+              "byteOrder": "AB"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -41,6 +41,8 @@ CLI 不带参数时检查 manifest 全部样例；无效样例产生预期错误
 |---|---|---|---|
 | config/set | configSet | 接收 | 是 |
 | config/ack | configAck | 发布 | 否 |
+| config/patch | configPatch | 接收 | 否 |
+| config/patch/ack | configPatchAck | 发布 | 否 |
 | config/get | configGet | 发布 | 否 |
 | data | data | 发布 | 否 |
 | data/ack | dataAck | 接收 | 否 |
@@ -49,7 +51,9 @@ CLI 不带参数时检查 manifest 全部样例；无效样例产生预期错误
 | device/status | deviceStatus | 发布 | 否 |
 | event | event | 发布 | 否 |
 
-实际 ACL 逐项生成，Agent 不能发布 config/set 或 data/ack。command Topic 未进入 v1。
+实际 ACL 逐项生成，Agent 不能发布 config/set、config/patch 或 data/ack。设备写操作的 command Topic 未进入 v1。
+
+`config/get` 可携带 `configCapabilities: ["devicePatchV1"]` 和 `activeMessageId`，用于协商设备增量能力和精准基础身份。设备增量 `configPatch` 及独立 `configPatchAck` 的完整规则见[设备增量配置说明](../doc/设备增量配置说明.md)。原 `configSet` / `configAck` 的完整快照和同版应用语义保持不变。
 
 ## 4. PLC 完整配置快照
 

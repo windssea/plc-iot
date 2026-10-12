@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "gatewayId": "PLC-01",
+  "timestamp": 1788748123123,
+  "messageId": "patch-PLC-01-11",
+  "configVersion": 11,
+  "status": "APPLIED",
+  "errors": [],
+  "appliedConfigVersion": 11,
+  "activeConfigVersion": 12,
+  "activeMessageId": "patch-PLC-01-12"
+}

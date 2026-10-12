@@ -121,5 +121,15 @@
     "kind": "configSet",
     "valid": false,
     "code": "SCHEMA_INVALID"
+  },
+  {
+    "file": "valid/config-patch.json",
+    "kind": "configPatch",
+    "valid": true
+  },
+  {
+    "file": "valid/config-patch-ack.json",
+    "kind": "configPatchAck",
+    "valid": true
   }
 ]

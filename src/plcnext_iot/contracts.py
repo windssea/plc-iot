@@ -9,12 +9,14 @@ from itertools import islice
 import json
 import math
 from pathlib import Path
+import threading
 
 from jsonschema import Draft202012Validator
 from referencing import Registry
 
 CONTRACT_DIR = Path(__file__).resolve().parents[2] / "contracts"
 MAX_ISSUES = 32
+_SCHEMA_LOCK = threading.Lock()
 
 
 @dataclass(frozen=True)
@@ -30,10 +32,20 @@ def topic_rules() -> dict:
     return {item["kind"]: item for item in data["topics"]}
 
 
-@lru_cache(maxsize=9)
-def _validator(kind: str) -> Draft202012Validator:
+@lru_cache(maxsize=1)
+def _schema():
+    """One immutable-by-convention schema shared by every message validator."""
     schema = json.loads((CONTRACT_DIR / "v1/protocol.schema.json").read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(schema)
+    return schema
+
+
+@lru_cache(maxsize=11)
+def _validator(kind: str) -> Draft202012Validator:
+    # lru_cache alone permits concurrent first-load calls. Serialize the cache
+    # lookup, not validation, so worker/MQTT threads load and check it once.
+    with _SCHEMA_LOCK:
+        schema = _schema()
     # References remain local. Registry's default retrieval refuses network I/O.
     entry = {"$schema": schema["$schema"], "$defs": schema["$defs"],
              "$ref": "#/$defs/" + kind}
@@ -104,6 +116,17 @@ def validate_message(kind: str, payload: bytes, *,
 def _semantic_issues(kind: str, message: dict) -> list[Issue]:
     if kind == "configSet":
         return _config_issues(message["config"])
+    if kind == "configPatch":
+        return _patch_issues(message)
+    if kind == "configPatchAck":
+        if message['status'] == 'APPLIED' and (
+                message['appliedConfigVersion'] != message['configVersion']
+                or message['activeConfigVersion'] < message['appliedConfigVersion']):
+            return [Issue('ACK_VERSION_MISMATCH', '/appliedConfigVersion',
+                          'APPLIED must identify a committed requested version.')]
+        return _active_identity_issues(message)
+    if kind == "configGet" and 'activeMessageId' in message:
+        return _active_identity_issues(message)
     if kind == "configAck" and message["status"] == "APPLIED":
         if message["configVersion"] != message["activeConfigVersion"]:
             return [Issue("ACK_VERSION_MISMATCH", "/activeConfigVersion",
@@ -119,6 +142,30 @@ def _semantic_issues(kind: str, message: dict) -> list[Issue]:
     if kind == "heartbeat":
         return _heartbeat_issues(message)
     return []
+
+
+def _active_identity_issues(message):
+    if (message['activeConfigVersion'] == 0) != (message['activeMessageId'] is None):
+        return [Issue('ACK_VERSION_MISMATCH', '/activeMessageId',
+                      'The active message identity must match configured state.')]
+    return []
+
+
+def _patch_issues(message):
+    if message['configVersion'] <= message['baseConfigVersion']:
+        return [Issue('STALE_VERSION', '/configVersion', 'Target version must exceed its base.')]
+    issues, seen = [], set()
+    for index, operation in enumerate(message['operations']):
+        path = f'/operations/{index}'
+        if operation['deviceId'] in seen:
+            issues.append(Issue('OPERATION_CONFLICT', path+'/deviceId', 'One operation per device is required.'))
+        seen.add(operation['deviceId'])
+        if 'device' in operation:
+            if operation['device']['deviceId'] != operation['deviceId']:
+                issues.append(Issue('OPERATION_CONFLICT', path+'/device/deviceId', 'Operation and device identity differ.'))
+            for issue in _config_issues(dict(devices=[operation['device']])):
+                issues.append(Issue(issue.code, issue.path.replace('/config/devices/0', path+'/device'), issue.message))
+    return issues
 
 
 def _config_issues(config: dict) -> list[Issue]:

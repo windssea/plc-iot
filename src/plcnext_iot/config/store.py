@@ -6,6 +6,7 @@ worker thread, not on the event loop. Never send APPLIED solely after prepare().
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+import hashlib
 import re
 import sqlite3
 import uuid
@@ -13,6 +14,7 @@ import uuid
 from plcnext_iot.contracts import Issue
 from plcnext_iot.config.locking import StoreInUse, StoreLock
 from plcnext_iot.config.models import ConfigSnapshot, ConfigValidationError
+from plcnext_iot.config.patch import parse_command, materialize
 
 APPLICATION_ID = 0x50494F54
 SCHEMA_VERSION = 1
@@ -41,6 +43,8 @@ class PrepareResult:
     token: str | None = None
     code: str | None = None
     issues: tuple[Issue, ...] = ()
+    snapshot: ConfigSnapshot | None = None
+    applied_config_version: int | None = None
 
 
 class ConfigStore:
@@ -123,10 +127,19 @@ class ConfigStore:
                     previous_version INTEGER REFERENCES snapshots(version))""")
                 c.execute("""CREATE TABLE requests (
                     message_id TEXT PRIMARY KEY, version INTEGER NOT NULL REFERENCES snapshots(version),
-                    status TEXT NOT NULL CHECK(status IN ('PREPARED','APPLIED','FAILED','INTERRUPTED')))""")
+                    status TEXT NOT NULL CHECK(status IN ('PREPARED','APPLIED','FAILED','INTERRUPTED')),
+                    command_digest TEXT, command_kind TEXT)""")
                 c.execute("INSERT INTO metadata(id,gateway_id) VALUES(1,?)", (self.gateway_id,))
                 c.execute(f"PRAGMA application_id={APPLICATION_ID}")
                 c.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+            # Compatible additive metadata for exact command replay. Only the
+            # OS-lock owner migrates; old configSet receipts keep NULL columns.
+            columns = {row['name']: row for row in c.execute('PRAGMA table_info(requests)')}
+            for name in ('command_digest', 'command_kind'):
+                if name not in columns:
+                    c.execute(f'ALTER TABLE requests ADD COLUMN {name} TEXT')
+                elif columns[name]['type'].upper() != 'TEXT' or columns[name]['notnull']:
+                    raise StoreFormatError('Unknown command receipt column format.')
             # Only the OS-lock owner may recover interrupted preparations.
             c.execute("UPDATE requests SET status='INTERRUPTED' WHERE status='PREPARED'")
             c.execute("UPDATE snapshots SET state='INTERRUPTED',token=NULL WHERE state='PREPARED'")
@@ -166,15 +179,51 @@ class ConfigStore:
         with self._transaction():
             return self._prepare(snapshot)
 
-    def _prepare(self, snapshot):
+    def prepare_patch(self, payload: bytes) -> PrepareResult:
+        try:
+            command = parse_command(payload, self.gateway_id)
+        except ConfigValidationError as exc:
+            return PrepareResult('REJECTED', self._versions()[0], code=exc.issues[0].code, issues=exc.issues)
+        digest = hashlib.sha256(payload).hexdigest()
+        with self._transaction():
+            active, _ = self._versions()
+            def reject(code):
+                return PrepareResult('REJECTED', active, code=code)
+            receipt = self._conn.execute('SELECT * FROM requests WHERE message_id=?',
+                                         (command['messageId'],)).fetchone()
+            if receipt:
+                if (receipt['version'] != command['configVersion'] or receipt['command_kind'] != 'configPatch'
+                        or receipt['command_digest'] != digest):
+                    return reject('MESSAGE_ID_CONFLICT')
+                if receipt['status'] == 'APPLIED':
+                    saved = self._conn.execute('SELECT * FROM snapshots WHERE version=?',
+                                               (receipt['version'],)).fetchone()
+                    if (saved is None or saved['state'] != 'COMMITTED' or receipt['version'] > active
+                            or self._decode(saved).message_id != command['messageId']):
+                        raise StoreFormatError('Applied command receipt is inconsistent.')
+                    # Historical exact replay must precede stale-base checks.
+                    return PrepareResult('APPLIED', active, applied_config_version=receipt['version'])
+            saved = self._conn.execute('SELECT * FROM snapshots WHERE version=?',
+                                       (command['configVersion'],)).fetchone()
+            if saved and self._decode(saved).message_id != command['messageId']:
+                return reject('VERSION_CONFLICT')
+            try:
+                snapshot = materialize(command, self.load_active(), self.gateway_id)
+            except ConfigValidationError as exc:
+                return PrepareResult('REJECTED', active, code=exc.issues[0].code, issues=exc.issues)
+            return self._prepare(snapshot, digest, 'configPatch')
+
+    def _prepare(self, snapshot, command_digest=None, command_kind=None):
         c = self._conn
         active, _ = self._versions()
 
         def reject(code):
             return PrepareResult("REJECTED", active, code=code)
 
-        request = c.execute("SELECT version FROM requests WHERE message_id=?", (snapshot.message_id,)).fetchone()
-        if request and request[0] != snapshot.config_version:
+        request = c.execute("SELECT * FROM requests WHERE message_id=?", (snapshot.message_id,)).fetchone()
+        if request and (request['version'] != snapshot.config_version
+                        or request['command_kind'] != command_kind
+                        or request['command_digest'] != command_digest):
             return reject("MESSAGE_ID_CONFLICT")
         if snapshot.config_version < active:
             return reject("STALE_VERSION")
@@ -200,9 +249,11 @@ class ConfigStore:
                       (snapshot.config_version, snapshot.wire_json, snapshot.content_hash, "PREPARED", token))
         elif not applied:
             c.execute("UPDATE snapshots SET state='PREPARED',token=? WHERE version=?", (token, snapshot.config_version))
-        c.execute("INSERT INTO requests VALUES(?,?,?) ON CONFLICT(message_id) DO UPDATE SET status=excluded.status",
-                  (snapshot.message_id, snapshot.config_version, status))
-        return PrepareResult(status, active, token)
+        c.execute("""INSERT INTO requests(message_id,version,status,command_digest,command_kind) VALUES(?,?,?,?,?)
+                  ON CONFLICT(message_id) DO UPDATE SET status=excluded.status""",
+                  (snapshot.message_id, snapshot.config_version, status, command_digest, command_kind))
+        return PrepareResult(status, active, token, snapshot=snapshot if command_kind else None,
+                             applied_config_version=snapshot.config_version if command_kind and applied else None)
 
     def _candidate(self, token):
         if not isinstance(token, str) or not token:

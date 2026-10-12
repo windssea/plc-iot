@@ -2,7 +2,8 @@
 import asyncio
 import uuid
 
-from plcnext_iot.messaging.messages import config_ack, config_get, status, identity
+from plcnext_iot.messaging.messages import config_ack, config_patch_ack, config_get, status, identity
+from plcnext_iot.core.lifecycle import ApplyResult
 from plcnext_iot.messaging.transport import PahoConnection
 from plcnext_iot.messaging.health import HealthPublisher
 
@@ -47,7 +48,7 @@ class MqttConfigService:
         try:
             while not self._stop.is_set() and self.agent.state != 'FAILED':
                 self.session_id = 'session-' + uuid.uuid4().hex
-                topics=[self.prefix+'config/set']
+                topics=[self.prefix+'config/set', self.prefix+'config/patch']
                 if self.telemetry is not None:
                     topics.append(self.prefix+'data/ack')
                 connection = PahoConnection(self.settings,'iot-' + self.gateway,topics,
@@ -85,12 +86,21 @@ class MqttConfigService:
                             if request is None:
                                 self.unacknowledged += 1
                                 continue
-                            result = await self.agent.submit(incoming.payload)
-                            ack = await asyncio.to_thread(config_ack,incoming.payload,result,self.gateway)
+                            patch = incoming.topic == self.prefix+'config/patch'
+                            if patch and incoming.retained:
+                                result = ApplyResult('REJECTED', self.agent.active_config_version, 'RETAINED_PATCH',
+                                                     active_message_id=self.agent.active_message_id)
+                            else:
+                                result = (await self.agent.submit(incoming.payload, kind='configPatch')
+                                          if patch else await self.agent.submit(incoming.payload))
+                            ack = await asyncio.to_thread(config_patch_ack if patch else config_ack,
+                                                          incoming.payload,result,self.gateway)
                             if ack is not None:
-                                await connection.publish(self.prefix+'config/ack',ack)
+                                await connection.publish(self.prefix+('config/patch/ack' if patch else 'config/ack'),ack)
                             else:
                                 self.unacknowledged += 1
+                            if patch:
+                                await self._request_config(connection)
                         if asyncio.get_running_loop().time() >= next_get:
                             await self._request_config(connection)
                             next_get = asyncio.get_running_loop().time() + 30
@@ -120,5 +130,7 @@ class MqttConfigService:
 
     async def _request_config(self, connection):
         version = self.agent.active_config_version
-        if version is not None:
-            await connection.publish(self.prefix+'config/get',config_get(self.gateway,version,self.session_id))
+        message_id = self.agent.active_message_id
+        if version is not None and (version == 0 or message_id is not None):
+            await connection.publish(self.prefix+'config/get',config_get(
+                self.gateway,version,self.session_id,active_message_id=message_id,capabilities=True))

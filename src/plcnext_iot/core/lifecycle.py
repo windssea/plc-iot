@@ -19,6 +19,8 @@ class ApplyResult:
     active_config_version: int | None
     code: str | None = None
     issues: tuple[Issue, ...] = ()
+    applied_config_version: int | None = None
+    active_message_id: str | None = None
 
 
 class AgentLifecycle:
@@ -41,11 +43,17 @@ class AgentLifecycle:
     def active_config_version(self):
         return self._durable_version
 
+    @property
+    def active_message_id(self):
+        return (self._active.message_id if self._active is not None
+                and self._active.config_version == self._durable_version else None)
+
     async def wait_failed(self):
         await self._failed.wait()
 
-    def _result(self, status, code=None, issues=()):
-        return ApplyResult(status, self._durable_version, code, tuple(issues))
+    def _result(self, status, code=None, issues=(), applied_version=None):
+        return ApplyResult(status, self._durable_version, code, tuple(issues),
+                           applied_version, self.active_message_id)
 
     def _steady(self):
         if self.state == "FAILED":
@@ -90,7 +98,7 @@ class AgentLifecycle:
             await self._storage.close()
             raise LifecycleError("Agent startup failed; no running state was announced.") from None
 
-    async def submit(self, payload: bytes) -> ApplyResult:
+    async def submit(self, payload: bytes, *, kind='configSet') -> ApplyResult:
         if self._closing:
             return self._result("REJECTED", "STOPPING")
         if self.state not in {"WAITING_CONFIG", "RUNNING", "DISABLED", "APPLYING"}:
@@ -99,9 +107,11 @@ class AgentLifecycle:
             return self._result("REJECTED", "INVALID_JSON")
         if len(payload) > 2 * 1024 * 1024:
             return self._result("REJECTED", "PAYLOAD_TOO_LARGE")
+        if kind not in ('configSet', 'configPatch'):
+            return self._result('REJECTED', 'UNSUPPORTED_MESSAGE')
         future = asyncio.get_running_loop().create_future()
         try:
-            self._queue.put_nowait((payload, future))
+            self._queue.put_nowait((payload, future, kind))
         except asyncio.QueueFull:
             return self._result("REJECTED", "RESOURCE_LIMIT")
         # Accepted work belongs to the actor, not to a network caller's lifetime.
@@ -114,7 +124,7 @@ class AgentLifecycle:
             except asyncio.QueueEmpty:
                 return
             if item is not None:
-                _, future = item
+                _, future, _ = item
                 if not future.done():
                     future.set_result(self._result("REJECTED", code))
             self._queue.task_done()
@@ -125,9 +135,9 @@ class AgentLifecycle:
             if item is None:
                 self._queue.task_done()
                 return
-            payload, future = item
+            payload, future, kind = item
             try:
-                result = await self._apply(payload)
+                result = await self._apply(payload, kind)
             except asyncio.CancelledError:
                 self._durable_version = None
                 await self._fatal("COORDINATOR_CANCELLED")
@@ -142,10 +152,10 @@ class AgentLifecycle:
                 self._drain("NOT_RUNNING")
                 return
 
-    async def _apply(self, payload):
+    async def _apply(self, payload, kind='configSet'):
         self.state = "APPLYING" if not self._closing else "STOPPING"
         try:
-            prepared = await self._storage.call("prepare", payload)
+            prepared = await self._storage.call('prepare_patch' if kind == 'configPatch' else 'prepare', payload)
         except StoreFormatError:
             await self._fatal("STORAGE_CORRUPT")
             return self._result("FAILED", "STORAGE_ERROR")
@@ -161,9 +171,9 @@ class AgentLifecycle:
                 await self._fatal("RUNTIME_VERSION_MISMATCH")
                 return self._result("FAILED", "RUNTIME_VERSION_MISMATCH")
             self._steady()
-            return self._result("APPLIED")
+            return self._result("APPLIED", applied_version=prepared.applied_config_version)
 
-        snapshot = await self._storage.parse(payload)
+        snapshot = prepared.snapshot if kind == 'configPatch' else await self._storage.parse(payload)
         try:
             transition = self.runtime.prepare(snapshot)
         except Exception as exc:
@@ -202,7 +212,7 @@ class AgentLifecycle:
         transition.publish()  # No await: publish runtime and version as one loop turn.
         self._active = committed
         self._steady()
-        return self._result("APPLIED")
+        return self._result("APPLIED", applied_version=committed.config_version if kind == 'configPatch' else None)
 
     async def _restore(self, transition, token, code):
         try:

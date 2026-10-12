@@ -29,6 +29,12 @@
     },
     {
       "$ref": "#/$defs/event"
+    },
+    {
+      "$ref": "#/$defs/configPatch"
+    },
+    {
+      "$ref": "#/$defs/configPatchAck"
     }
   ],
   "$defs": {
@@ -902,6 +908,26 @@
         },
         "sessionId": {
           "$ref": "#/$defs/id"
+        },
+        "configCapabilities": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "devicePatchV1"
+            ]
+          },
+          "uniqueItems": true,
+          "maxItems": 1
+        },
+        "activeMessageId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     },
@@ -1486,6 +1512,361 @@
           "$ref": "#/$defs/id"
         }
       }
+    },
+    "configPatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "gatewayId",
+        "timestamp",
+        "messageId",
+        "configVersion",
+        "baseConfigVersion",
+        "baseMessageId",
+        "operations"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "gatewayId": {
+          "$ref": "#/$defs/id"
+        },
+        "timestamp": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "messageId": {
+          "$ref": "#/$defs/id"
+        },
+        "configVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "baseConfigVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "baseMessageId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "operations": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 50,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "op",
+              "deviceId"
+            ],
+            "properties": {
+              "op": {
+                "enum": [
+                  "add",
+                  "replace",
+                  "remove"
+                ]
+              },
+              "deviceId": {
+                "$ref": "#/$defs/id"
+              },
+              "device": {
+                "$ref": "#/$defs/device"
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "op": {
+                      "const": "remove"
+                    }
+                  },
+                  "required": [
+                    "op"
+                  ]
+                },
+                "then": {
+                  "not": {
+                    "required": [
+                      "device"
+                    ]
+                  }
+                },
+                "else": {
+                  "required": [
+                    "device"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "gateway": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "report": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "batchIntervalMs",
+                "maxBatchPoints"
+              ],
+              "properties": {
+                "batchIntervalMs": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 86400000
+                },
+                "maxBatchPoints": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 500
+                }
+              }
+            }
+          },
+          "minProperties": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "baseConfigVersion": {
+                "const": 0
+              }
+            },
+            "required": [
+              "baseConfigVersion"
+            ]
+          },
+          "then": {
+            "required": [
+              "gateway"
+            ],
+            "properties": {
+              "baseMessageId": {
+                "type": "null"
+              },
+              "gateway": {
+                "required": [
+                  "enabled",
+                  "report"
+                ]
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "baseMessageId": {
+                "$ref": "#/$defs/id"
+              }
+            }
+          }
+        }
+      ],
+      "anyOf": [
+        {
+          "properties": {
+            "operations": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "required": [
+            "gateway"
+          ]
+        }
+      ]
+    },
+    "patchError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "path",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "enum": [
+            "SCHEMA_INVALID",
+            "INVALID_JSON",
+            "PAYLOAD_TOO_LARGE",
+            "GATEWAY_MISMATCH",
+            "DUPLICATE_DEVICE_ID",
+            "DUPLICATE_POINT_ID",
+            "DUPLICATE_NODE_ID",
+            "INVALID_ADDRESS",
+            "INVALID_STALE_INTERVAL",
+            "POINT_LIMIT_EXCEEDED",
+            "VERSION_CONFLICT",
+            "STALE_VERSION",
+            "RESOURCE_LIMIT",
+            "STORAGE_ERROR",
+            "APPLY_FAILED",
+            "UNKNOWN_CONFIG_VERSION",
+            "UNKNOWN_DEVICE",
+            "UNKNOWN_POINT",
+            "EXPIRED_DATA",
+            "INVALID_TIMESTAMP",
+            "DUPLICATE_VALUE",
+            "BASE_CONFIG_MISMATCH",
+            "DEVICE_EXISTS",
+            "DEVICE_NOT_FOUND",
+            "OPERATION_CONFLICT"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "maxLength": 512,
+          "pattern": "^(|/.*)$"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "deviceId": {
+          "$ref": "#/$defs/id"
+        },
+        "pointId": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "configPatchAck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "gatewayId",
+        "timestamp",
+        "messageId",
+        "configVersion",
+        "activeConfigVersion",
+        "status",
+        "errors",
+        "appliedConfigVersion",
+        "activeMessageId"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "gatewayId": {
+          "$ref": "#/$defs/id"
+        },
+        "timestamp": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "messageId": {
+          "$ref": "#/$defs/id"
+        },
+        "configVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "activeConfigVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "status": {
+          "enum": [
+            "APPLIED",
+            "REJECTED",
+            "FAILED"
+          ]
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/patchError"
+          },
+          "maxItems": 32,
+          "minItems": 0
+        },
+        "appliedConfigVersion": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "activeMessageId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "APPLIED"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "errors": {
+                "maxItems": 0
+              },
+              "appliedConfigVersion": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "errors": {
+                "minItems": 1
+              },
+              "appliedConfigVersion": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }
