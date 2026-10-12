@@ -5,12 +5,13 @@ const form=document.querySelector('#setup'), notice=document.querySelector('#not
       confirmBox=document.querySelector('#confirm');
 const $=(selector)=>document.querySelector(selector);
 let token='', editing=false, busy=false;
+let deviceView=false, deviceRequest=0, pageEpoch=0, selectedDeviceId=null, deviceMeta=null;
 
 const MESSAGES={INVALID_SETTINGS:'请检查端口、用户名/密码及 CA 证书。',
   CONNECTION_FAILED:'连接失败，请检查网络、Broker 地址、证书和凭据。',
   SAVE_FAILED:'设置保存失败，请检查设备存储后重试。', BUSY:'设备正在处理另一项操作，请稍后重试。',
   FORBIDDEN:'页面已失效，请刷新后重试。', NOT_CONFIGURED:'设备尚未初始化，请刷新页面后重新填写。',
-  IDENTITY_IMMUTABLE:'PLC ID 不可修改，请只修改平台连接设置。',
+  IDENTITY_IMMUTABLE:'设备 / 网关 ID 不可修改，请只修改平台连接设置。',
   CA_REQUIRES_TLS:'填写私有 CA 时必须同时开启 TLS 加密。',
   PASSWORD_REQUIRED:'使用用户名时必须填写密码。',
   PASSWORD_WITHOUT_USERNAME:'要改为匿名连接，请同时清空用户名与密码。'};
@@ -20,9 +21,9 @@ function buttons(disabled){form.querySelectorAll('button').forEach(b=>{b.disable
 
 function render(data,note){
   loading.hidden=true;
-  if(!data||!data.configured){summary.hidden=true;form.hidden=false;editing=false;applyMode();return;}
+  if(!data||!data.configured){summary.hidden=true;form.hidden=false;editing=false;applyMode();if(deviceView)form.hidden=true;return;}
   const nodes=[];
-  for(const [label,value,extra] of [['PLC ID',data.gatewayId,'不可修改'],
+  for(const [label,value,extra] of [['设备 / 网关 ID',data.gatewayId,'不可修改'],
       ['Broker 地址',data.host],['端口',String(data.port)],
       ['TLS 加密',data.tls?'已开启':'未开启'],['用户名',data.username||'匿名连接'],
       ['密码',data.passwordSet?'已设置':'未设置'],['私有 CA',data.caSet?'已配置':'未配置']]){
@@ -33,10 +34,10 @@ function render(data,note){
   }
   facts.replaceChildren(...nodes);
   state.textContent=note||'采集服务正在使用以上配置。';
-  summary.hidden=false;form.hidden=true;confirmBox.hidden=true;editing=false;applyMode();
+  summary.hidden=deviceView;form.hidden=true;confirmBox.hidden=true;editing=false;applyMode();
 }
 
-// The saved PLC identity is read-only: the collection database is bound to it.
+// The saved device identity is read-only: the collection database is bound to it.
 function applyMode(){
   $('#gatewayId').readOnly=editing;
   $('#identityNote').hidden=!editing;
@@ -115,13 +116,16 @@ $('#test').addEventListener('click',()=>send('test'));
 $('#confirmYes').addEventListener('click',()=>{confirmBox.hidden=true;send('setup');});
 $('#confirmNo').addEventListener('click',()=>{confirmBox.hidden=true;});
 $('#edit').addEventListener('click',async()=>{
-  try{fill(await load('/api/config'));editing=true;applyMode();
+  const epoch=pageEpoch;
+  try{const data=await load('/api/config');
+    if(deviceView||epoch!==pageEpoch)return;
+    fill(data);editing=true;applyMode();
     summary.hidden=true;form.hidden=false;confirmBox.hidden=true;}
-  catch{say('无法读取已保存的设置，请刷新页面后重试。');}
+  catch{if(!deviceView&&epoch===pageEpoch)say('无法读取已保存的设置，请刷新页面后重试。');}
 });
 $('#cancel').addEventListener('click',async()=>{
   confirmBox.hidden=true;say('');
-  try{await refresh();}catch{summary.hidden=false;form.hidden=true;}
+  try{await refresh();}catch{summary.hidden=deviceView;form.hidden=true;}
 });
 $('#tls').addEventListener('change',event=>{
   const port=$('#port');
@@ -133,3 +137,117 @@ $('#removeca').addEventListener('change',event=>{if(event.target.checked)$('#caP
 $('#caPem').addEventListener('input',event=>{if(event.target.value)$('#removeca').checked=false;});
 $('#username').addEventListener('input',event=>{if(!event.target.value)$('#password').value='';});
 refresh().catch(()=>{loading.textContent='无法读取设备状态，请刷新重试。';});
+
+// Device views read the committed collection snapshot; they never change it.
+const PROTOCOLS={modbusTcp:'Modbus TCP',modbus_tcp:'Modbus TCP',modbus:'Modbus TCP',opcua:'OPC UA'};
+const AREAS={holding_register:'保持寄存器',input_register:'输入寄存器',coil:'线圈',discrete_input:'离散输入'};
+const REPORT_MODES={cyclic:'周期',change:'变化上报',change_or_cyclic:'变化或周期上报'};
+function node(tag,text,className){
+  const result=document.createElement(tag);
+  if(text!==undefined&&text!==null)result.textContent=String(text);
+  if(className)result.className=className;
+  return result;
+}
+function shown(value){return value===undefined||value===null||value===''?'—':String(value);}
+function onOff(value){return value===true?'已启用':value===false?'已停用':'—';}
+function factsInto(target,entries){
+  target.replaceChildren(...entries.flatMap(([label,value])=>[node('dt',label),node('dd',shown(value))]));
+}
+function collectionMeta(data){
+  deviceMeta=data;
+  const entries=[['设备 / 网关 ID',data.gatewayId],['配置版本',data.configVersion>0?'v'+data.configVersion:'尚未下发'],['全局采集',onOff(data.enabled)]];
+  if(data.configVersion>0){
+    entries.push(['消息标识',data.messageId]);
+    if(data.report)entries.push(['批量上报周期',shown(data.report.batchIntervalMs)+' ms'],['批量点数上限',data.report.maxBatchPoints]);
+  }
+  factsInto($('#configFacts'),entries);
+}
+function deviceState(text,error=false){$('#devicesStatus').textContent=text;$('#devicesStatus').className=error?'error':'';}
+async function collectionLoad(path){
+  const response=await fetch(path,{cache:'no-store'});
+  if(!response.ok){const err=Error();err.status=response.status;throw err;}
+  return response.json();
+}
+function viewDevices(){
+  if(busy)return;
+  deviceView=true;++pageEpoch;
+  document.querySelector('main').classList.add('devices-view');
+  $('#devicesPanel').hidden=false;summary.hidden=true;form.hidden=true;loading.hidden=true;
+  $('#devicesView').setAttribute('aria-pressed','true');$('#platformView').setAttribute('aria-pressed','false');
+  showDeviceList();
+}
+async function showDeviceList(){
+  selectedDeviceId=null;
+  const request=++deviceRequest;
+  $('#devicesTitle').textContent='设备列表';$('#deviceList').hidden=false;$('#deviceDetail').hidden=true;
+  $('#deviceList').replaceChildren();$('#configFacts').replaceChildren();
+  $('#refreshDevices').disabled=true;deviceState('正在读取已下发的设备配置…');
+  try{
+    const data=await collectionLoad('/api/devices');
+    if(!deviceView||request!==deviceRequest)return;
+    collectionMeta(data);
+    if(!data.devices.length){
+      deviceState(!data.configured?'设备尚未初始化。请先在平台连接页完成设置。':data.configVersion===0?'尚未收到采集配置。请在 Hub 中配置子设备并下发。':'本版本没有子设备。');return;
+    }
+    deviceState('共 '+data.devices.length+' 台设备 · 展示的是本地保存的配置');
+    const cards=data.devices.map(device=>{
+      const card=node('article',undefined,'device-card');const header=node('div',undefined,'device-card-header');
+      const heading=node('div');heading.append(node('h3',device.name),node('p',device.deviceId,'device-id'));
+      const detail=node('button','详情');detail.type='button';detail.setAttribute('aria-label','查看 '+device.name+' 的详情');
+      detail.addEventListener('click',()=>showDeviceDetail(device.deviceId));header.append(heading,detail);
+      const info=node('dl',undefined,'device-card-facts');
+      factsInto(info,[['南向协议',PROTOCOLS[device.protocol]||device.protocol],['配置状态',onOff(device.enabled)],['点位数',device.pointCount]]);
+      card.append(header,info);return card;
+    });
+    $('#deviceList').replaceChildren(...cards);
+  }catch{if(deviceView&&request===deviceRequest)deviceState('无法读取采集配置，请点击“刷新配置”重试。',true);}
+  finally{if(request===deviceRequest)$('#refreshDevices').disabled=false;}
+}
+function detailSection(title,entries){
+  const section=node('div',undefined,'detail-block');section.append(node('h3',title));
+  const list=node('dl',undefined,'detail-facts');factsInto(list,entries);section.append(list);return section;
+}
+function renderDeviceDetail(device){
+  const body=$('#deviceDetailBody'),connection=device.connection;
+  const connectionFields=[['主机',connection.host],['端口',connection.port]];
+  if(device.protocol==='opcua')connectionFields.push(['路径',connection.path],['安全策略',connection.securityPolicy],['安全模式',connection.securityMode],['用户名',connection.usernameSet?'已设置':'未设置'],['密码',connection.passwordSet?'已设置':'未设置']);
+  else connectionFields.push(['Unit ID',connection.unitId]);
+  connectionFields.push(['连接超时',shown(connection.connectTimeoutMs)+' ms'],['请求超时',shown(connection.requestTimeoutMs)+' ms'],['重试次数',connection.retryCount]);
+  const nodes=[detailSection('设备信息',[['设备名称',device.name],['设备标识',device.deviceId],['南向协议',PROTOCOLS[device.protocol]||device.protocol],['配置状态',onOff(device.enabled)]]),detailSection('连接配置',connectionFields),node('h3','采集点位（'+device.points.length+'）','points-heading')];
+  if(!device.points.length)nodes.push(node('p','该设备没有采集点位。'));
+  for(const point of device.points){
+    const entries=[['点位标识',point.pointId],['配置状态',onOff(point.enabled)],['数据类型',point.dataType],['单位',point.unit]];
+    if(point.modbus)entries.push(['寄存器区域',AREAS[point.modbus.area]||point.modbus.area],['零基地址',point.modbus.address],['字节序',point.modbus.byteOrder]);
+    if(point.opcua)entries.push(['Node ID',point.opcua.nodeId]);
+    entries.push(['比例因子',point.scale],['偏移',point.offset],['采集周期',shown(point.pollIntervalMs)+' ms'],['报告模式',REPORT_MODES[point.reportMode]||point.reportMode],['报告周期',shown(point.reportIntervalMs)+' ms'],['死区',point.deadband],['失效时间',shown(point.staleAfterMs)+' ms']);
+    nodes.push(detailSection(point.name||point.pointId,entries));
+  }
+  body.replaceChildren(...nodes);
+}
+async function showDeviceDetail(deviceId){
+  const expectedVersion=deviceMeta&&deviceMeta.configVersion;
+  const request=++deviceRequest;selectedDeviceId=deviceId;
+  $('#devicesTitle').textContent='设备配置详情';$('#deviceList').hidden=true;$('#deviceDetail').hidden=false;
+  $('#deviceDetailBody').replaceChildren();$('#configFacts').replaceChildren();
+  $('#refreshDevices').disabled=true;deviceState('正在读取设备配置与点位…');
+  try{
+    const data=await collectionLoad('/api/devices/'+encodeURIComponent(deviceId)+'?configVersion='+expectedVersion);
+    if(!deviceView||request!==deviceRequest)return;
+    if(data.configVersion!==expectedVersion){deviceState('配置已更新，请返回设备列表刷新后查看详情。',true);return;}
+    collectionMeta(data);renderDeviceDetail(data.device);
+    deviceState('以下设备和点位均来自本地保存的 v'+data.configVersion+' 配置。');
+  }catch(error){if(deviceView&&request===deviceRequest)deviceState(error.status===409?
+    '配置已更新，请返回设备列表刷新后查看详情。':error.status===404?'当前配置中已没有此设备。请返回设备列表查看最新配置。':'无法读取设备详情，请点击“刷新配置”重试。',true);}
+  finally{if(request===deviceRequest)$('#refreshDevices').disabled=false;}
+}
+$('#devicesView').addEventListener('click',viewDevices);
+$('#platformView').addEventListener('click',async()=>{
+  if(busy)return;
+  deviceView=false;++deviceRequest;++pageEpoch;selectedDeviceId=null;
+  document.querySelector('main').classList.remove('devices-view');$('#devicesPanel').hidden=true;
+  $('#devicesView').setAttribute('aria-pressed','false');$('#platformView').setAttribute('aria-pressed','true');
+  loading.hidden=false;loading.textContent='正在读取设备状态…';summary.hidden=true;form.hidden=true;
+  try{await refresh();}catch{loading.textContent='无法读取设备状态，请刷新重试。';}
+});
+$('#backDevices').addEventListener('click',showDeviceList);
+$('#refreshDevices').addEventListener('click',()=>selectedDeviceId===null?showDeviceList():showDeviceDetail(selectedDeviceId));

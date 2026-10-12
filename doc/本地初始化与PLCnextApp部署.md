@@ -2,7 +2,7 @@
 
 ## 当前已经实现
 
-0.2.0 容器默认运行 `tools.appliance`。首次启动打开本地初始化页面，填写已有 PLC ID、Broker 地址/端口、TLS、用户名/密码和可选私有 CA 证书。支持独立测试 Broker 认证，也支持离线保存后自动重连。无需上传或编辑 bootstrap.json、mqtt.json、agent.env。初始化完成后页面显示当前配置，并允许修改平台连接部分。
+0.2.0 容器默认运行 `tools.appliance`。首次启动打开本地初始化页面，填写平台中已有的设备/网关 ID、Broker 地址/端口、TLS、用户名/密码和可选私有 CA 证书。身份可对应 PLC、VPLC 或独立 IoT 网关。支持独立测试 Broker 认证，也支持离线保存后自动重连。无需上传或编辑 bootstrap.json、mqtt.json、agent.env。初始化完成后页面显示当前平台连接配置，并允许修改平台连接部分。
 
 ```sh
 docker load -i plcnext-iot-amd64.tar
@@ -12,6 +12,14 @@ docker compose -f deploy/container/compose.yaml up -d
 然后访问 `http://设备IP:8080`。ARM64/ARMv7 使用对应标签，通过 IOT_IMAGE 选择镜像；Compose 默认标签为 `plcnext-iot:0.2.0-amd64`。端口 8080 如与其他应用冲突，需要由部署方调整宿主机映射。
 
 页面及全部静态资源随镜像提供，不访问外部 CDN。测试连接只验证 Broker TCP/TLS 和 MQTT 认证，不验证 config/set 等 Topic 权限。保存成功只表示本地写入成功，页面不会将它显示为已联网。
+
+## 查看平台下发的设备与点位
+
+点击页面中的“设备列表”，查看终端已接收并提交的有效采集配置。列表显示配置版本、设备名称与标识、南向协议、启用状态和点位数量；点击某台设备的“详情”，查看连接地址、端口、超时及重试参数，以及各点位的类型、Modbus 地址/字节序或 OPC UA NodeId、单位、比例、偏移、采集和报告周期、死区及失效时间。
+
+该入口只读。新增或修改子设备与点位仍在 Hub 中完成，正常发布并得到终端确认后，回到 IoT Web 刷新列表即可查看。尚未接收有效配置时显示空列表；配置在打开详情前已变更时提示刷新，不将旧详情标记为新版本。此处显示本地已提交的配置，不用列表中的启用状态代替设备连接状态或实时采集质量。
+
+接口为 `GET /api/devices` 和 `GET /api/devices/<deviceId>?configVersion=<列表版本>`。数据取自同一持久目录下 `agent.db` 的有效提交快照；读取不会认领配置存储锁、改变配置、重启 Agent 或下发 MQTT 消息。连接凭据只显示是否配置，不返回密码、认证环境变量内容或私有 CA。
 
 ## 保存和恢复
 
