@@ -351,7 +351,7 @@ async function refreshSamples(){
     if(data.configVersion!==view.version||data.deviceId!==view.deviceId||data.gatewayId!==view.gatewayId){const error=Error();error.status=409;throw error;}
     if(!Array.isArray(data.points))throw Error('INVALID_SAMPLES');
     paintSamples(view,data);
-    sampleStatus('最近读取：'+sampleTime(Date.now())+' · 下表时间是实际采集时间。'+($('#autoSamples').checked?' 每次请求完成后间隔 5 秒刷新。':' 自动刷新已暂停。'));
+    sampleStatus('最近读取：'+sampleTime(Date.now())+' · 下表时间是实际采集时间。'+($('#autoSamples').checked?' 每次请求完成后间隔 5 秒刷新。':' 自动刷新未开启，显示上次读取的采样。'));
   }catch(error){
     if(!sampleViewActive(view)||view.controller!==controller)return;
     clearSampleValues(view,'读取失败');
@@ -373,7 +373,7 @@ $('#autoSamples').addEventListener('change',()=>{
   if(!samples||samples.blocked)return;
   cancelSampleWork(samples);$('#refreshSamples').disabled=false;
   if($('#autoSamples').checked&&sampleViewActive(samples))refreshSamples();
-  else sampleStatus('自动刷新已暂停，可点击“刷新采样”读取。');
+  else sampleStatus('自动刷新已暂停，显示上次读取的采样。可点击“刷新采样”读取。');
 });
 function suspendSamples(){cancelSampleWork(samples);$('#refreshSamples').disabled=false;}
 if(document.addEventListener)document.addEventListener('visibilitychange',()=>{

@@ -22,8 +22,12 @@ const device={deviceId:'d/A',name:'Device A',enabled:true,protocol:'modbus_tcp',
 const url='/api/devices/d%2FA/samples?configVersion=2';
 const response=points=>({gatewayId:'edge-1',configVersion:2,deviceId:'d/A',points});
 const good=[{pointId:'zero',value:0,timestamp:1720000000000,quality:'GOOD'},{pointId:'bool',value:false,timestamp:1720000000000,quality:'GOOD'},{pointId:'text',value:'<img onerror=x>',timestamp:1720000000000,quality:'GOOD'}];
-async function harness(){
-  const elements=Object.fromEntries([...html.matchAll(/id="([^"]+)"/g)].map(m=>['#'+m[1],new Element()]));elements.main=new Element('main');elements['#autoSamples'].checked=true;
+async function harness({enableAuto=true}={}){
+  const elements=Object.fromEntries([...html.matchAll(/id="([^"]+)"/g)].map(m=>['#'+m[1],new Element()]));elements.main=new Element('main');
+  const autoInput=html.match(/<input\b[^>]*id="autoSamples"[^>]*>/)[0];
+  elements['#autoSamples'].checked=/\schecked(?:\s|=|>)/.test(autoInput);
+  // Existing polling cases explicitly opt into auto mode, as a user would.
+  if(enableAuto)elements['#autoSamples'].checked=true;
   const document={hidden:false,listeners:{},querySelector:s=>elements[s],createElement:tag=>new Element(tag),addEventListener(event,fn){this.listeners[event]=fn;}};
   const window={listeners:{},addEventListener(event,fn){this.listeners[event]=fn;}};
   let clock=0,next=1;const timers=new Map(),calls=[];
@@ -106,4 +110,13 @@ test('disabled gateway/device/all points are displayed from configuration withou
   for(const disabled of [{...metadata,enabled:false,device},{...metadata,device:{...device,enabled:false}},{...metadata,device:{...device,points:device.points.map(p=>({...p,enabled:false}))}}]){
     const h=await harness();h.routes.set('/api/devices/d%2FA?configVersion=2',()=>disabled);await h.open();assert.equal(h.sampleCalls().length,0);assert.equal(h.timers.size,0);assert.equal(h.row(0)[3].textContent,'已停用');assert.equal(h.elements['#refreshSamples'].disabled,true);
   }
+});
+
+test('HTML defaults to one read with no repeating work until the user opts in',async()=>{
+  const h=await harness({enableAuto:false});assert.equal(h.elements['#autoSamples'].checked,false);
+  await h.open();assert.equal(h.sampleCalls().length,1);assert.equal(h.timers.size,0);assert.match(h.elements['#samplesStatus'].textContent,/显示上次读取的采样/);
+  await h.advance(120000);assert.equal(h.sampleCalls().length,1);assert.equal(h.timers.size,0);
+  h.document.hidden=true;h.document.listeners.visibilitychange();h.document.hidden=false;h.document.listeners.visibilitychange();h.window.listeners.pagehide();h.window.listeners.pageshow();await settle();assert.equal(h.sampleCalls().length,1);
+  await h.elements['#refreshSamples'].listeners.click();assert.equal(h.sampleCalls().length,2);assert.equal(h.timers.size,0);
+  h.elements['#autoSamples'].checked=true;h.elements['#autoSamples'].listeners.change();await settle();assert.equal(h.sampleCalls().length,3);assert.equal(h.timers.size,1);
 });
