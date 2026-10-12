@@ -273,7 +273,7 @@ class ProvisioningTests(unittest.IsolatedAsyncioTestCase):
         # Every element the script reaches for must exist, and only by id.
         self.assertEqual(set(re.findall(r"\$\('#([A-Za-z0-9_-]+)'\)",script))
                          -set(re.findall(r'id="([^"]+)"',html)),set())
-        routes={'/api/status','/api/config','/api/test','/api/setup'}
+        routes={'/api/status','/api/config','/api/test','/api/setup','/api/devices'}
         self.assertTrue(set(re.findall(r"'(/api/[a-z]+)'",script))<=routes)
         self.assertIn("'/api/'+path",script)
         for route in routes:self.assertIn(f"'{route}'",server)

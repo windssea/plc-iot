@@ -10,9 +10,12 @@ import asyncio
 import json
 from pathlib import Path
 import secrets
+import re
+from urllib.parse import unquote, urlsplit, parse_qs
 
 from plcnext_iot.messaging.transport import PahoConnection
 from plcnext_iot.provisioning.store import SettingsError, parse, parse_update
+from plcnext_iot.provisioning.devices import ConfigUnavailable, read_active, metadata, summary, detail
 
 
 CONFLICT_CODES = ('IDENTITY_IMMUTABLE', 'NOT_CONFIGURED')
@@ -58,6 +61,51 @@ class SetupServer:
         """What a request would produce, validated but not written."""
         return parse(body) if existing is None else parse_update(body, existing)
 
+    async def _devices(self, path):
+        """Only locally committed snapshots; this endpoint never connects southbound."""
+        parts = urlsplit(path)
+        device_id = None
+        expected = None
+        if parts.path != '/api/devices':
+            encoded = parts.path[len('/api/devices/'):]
+            # The wire contract constrains device IDs to one safe identifier.
+            # Decode exactly once and reject separators, malformed escapes and
+            # suffixes instead of using any request value as a filesystem path.
+            if re.search(r'%(?![0-9A-Fa-f]{2})', encoded):
+                return 404, None, dict(code='NOT_FOUND')
+            try:
+                device_id = unquote(encoded, errors='strict')
+            except UnicodeError:
+                return 404, None, dict(code='NOT_FOUND')
+            if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}', device_id):
+                return 404, None, dict(code='NOT_FOUND')
+        query = parse_qs(parts.query, keep_blank_values=True)
+        if query:
+            if (device_id is None or set(query) != {'configVersion'}
+                    or len(query['configVersion']) != 1
+                    or not re.fullmatch(r'[1-9][0-9]{0,15}', query['configVersion'][0])):
+                return 400, None, dict(code='INVALID_REQUEST')
+            expected = int(query['configVersion'][0])
+        if parts.fragment:
+            return 400, None, dict(code='INVALID_REQUEST')
+        gateway_id = self.value['gatewayId'] if self.value is not None else None
+        try:
+            snapshot = (await asyncio.to_thread(read_active, self.store.directory, gateway_id)
+                        if gateway_id is not None else None)
+        except ConfigUnavailable:
+            return 503, None, dict(code='CONFIG_UNAVAILABLE')
+        result = metadata(gateway_id, snapshot)
+        if expected is not None and result['configVersion'] != expected:
+            return 409, None, dict(code='CONFIG_CHANGED', **result)
+        if device_id is None:
+            result['devices'] = [summary(d) for d in snapshot.devices] if snapshot else []
+            return 200, None, result
+        device = next((d for d in snapshot.devices if d.device_id == device_id), None) if snapshot else None
+        if device is None:
+            return 404, None, dict(code='DEVICE_NOT_FOUND', **result)
+        result['device'] = detail(device)
+        return 200, None, result
+
     async def route(self, method, path, headers, body):
         if method == 'GET' and path == '/':
             return 200, 'text/html; charset=utf-8', (Path(__file__).parent/'web/index.html').read_bytes()
@@ -70,6 +118,9 @@ class SetupServer:
                                    changeSeq=self.change_seq, appliedSeq=self.applied_seq)
         if method == 'GET' and path == '/api/config':
             return 200, None, self._public()
+        if method == 'GET' and (path == '/api/devices' or path.startswith('/api/devices/')
+                                or path.startswith('/api/devices?')):
+            return await self._devices(path)
         if method != 'POST' or path not in ('/api/test','/api/setup'):
             return 404, None, dict(code='NOT_FOUND')
         if not secrets.compare_digest(headers.get('x-setup-token',''), self.token):
