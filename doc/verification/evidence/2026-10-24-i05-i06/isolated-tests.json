@@ -1,0 +1,465 @@
+{
+  "checkedAt": "2026-10-24T06:08:33.946432+00:00",
+  "tests": 152,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "prohibitedAttempts": [],
+  "databaseCreated": false,
+  "deviceConnections": false,
+  "stdlibAsyncioWakeupSocketPairs": 31,
+  "runtimeAgentStarted": false,
+  "approvedModules": [
+    "test_phase1_accounting",
+    "test_phase1_outbox",
+    "test_phase1_events",
+    "test_phase1_collectors",
+    "test_reporting",
+    "test_report_policy_clock",
+    "test_boot_reload_identity",
+    "test_runtime_health",
+    "test_contract_schema_sharing",
+    "test_opcua.OpcUaContractTests"
+  ],
+  "excludedCLI": "test_cli_exit_codes_and_does_not_echo_bad_payload",
+  "goldenContract": "HUB-IOT-PLC-P0/2",
+  "goldenCasesCovered": [
+    "R01",
+    "R02",
+    "R03",
+    "R04",
+    "R05",
+    "R06",
+    "R07",
+    "R08",
+    "R09",
+    "R10",
+    "R11",
+    "R12",
+    "R13",
+    "R14"
+  ],
+  "sourceFiles": [
+    {
+      "path": "src/plcnext_iot/__init__.py",
+      "sha256": "3d374c6c1e8c1dcb91f65fe7941b4a3c711d248ea4cdd8d963a54c193a3e6df9"
+    },
+    {
+      "path": "src/plcnext_iot/config/__init__.py",
+      "sha256": "8ef0e387ade60226969a1d3e867885466e17a57fb82030a6a40c658027e700df"
+    },
+    {
+      "path": "src/plcnext_iot/config/locking.py",
+      "sha256": "49cbf277efc6278c2bcb930b151fc48b4330267384edf4e5100d6805e406126b"
+    },
+    {
+      "path": "src/plcnext_iot/config/models.py",
+      "sha256": "d42cb0fbafeb340a1dabbfa3c6782bd8e6d9dadaf686b15f87dd567c11d7ffde"
+    },
+    {
+      "path": "src/plcnext_iot/config/patch.py",
+      "sha256": "1dc26742395bb95dc3c9275aa92ca20d4dbcc186168eebdbd9f87715fdf3e789"
+    },
+    {
+      "path": "src/plcnext_iot/config/store.py",
+      "sha256": "487fbb4012dc17e24824fcab4879806f35ffe4162cc065ecf2f838aec0b15d62"
+    },
+    {
+      "path": "src/plcnext_iot/contracts.py",
+      "sha256": "b3e62056b2723390e36fd8cac8e881a7dc27251a04312f084ba3fb5f8265d0c4"
+    },
+    {
+      "path": "src/plcnext_iot/core/__init__.py",
+      "sha256": "d1a91ad8afcb8d81aa5b1b26d2d09a1e3e507c09b12e34082b2f4d042733519b"
+    },
+    {
+      "path": "src/plcnext_iot/core/boot.py",
+      "sha256": "82584475901fa9fa6897ece21a075565283f3cfcb227cb4180fa40bd1b8a2e43"
+    },
+    {
+      "path": "src/plcnext_iot/core/bounds.py",
+      "sha256": "e0a9caf79a34b3441c1c57dce55645f3c8fa2fd8d483726145bc788fb5b9c3e9"
+    },
+    {
+      "path": "src/plcnext_iot/core/lifecycle.py",
+      "sha256": "3b89654e7345bc1f08386c634dae6669e20bfbb932b2312d67d5e06aff13664b"
+    },
+    {
+      "path": "src/plcnext_iot/core/sample_time.py",
+      "sha256": "ed930fa5ff1c7f1bbe3c07ec8a162336b5cdada95a00b9acee0951595779343a"
+    },
+    {
+      "path": "src/plcnext_iot/core/settings.py",
+      "sha256": "5dea1c3f7d3751ef525c6ada872bd31c3ccd77fa93f7e8fdbbe6292f1ab59a4a"
+    },
+    {
+      "path": "src/plcnext_iot/core/storage_worker.py",
+      "sha256": "dee35b7313cdacf424b81347bed10293fb51b9cb6b2da3d63675f25ab2e795f7"
+    },
+    {
+      "path": "src/plcnext_iot/devices/__init__.py",
+      "sha256": "c281607f80fa309030a50a33a25329424fcd109c76ff94cb46ab49c4102833f8"
+    },
+    {
+      "path": "src/plcnext_iot/devices/budget.py",
+      "sha256": "b813d2fd14aefdcef377df798aab38bccb3ad146d3b9b96ea1340841f4fce156"
+    },
+    {
+      "path": "src/plcnext_iot/devices/factory.py",
+      "sha256": "7c87e39d646a118d9b434080346b4615f0b6d3e8041f8b6166a129fe6dbb1b14"
+    },
+    {
+      "path": "src/plcnext_iot/devices/modbus.py",
+      "sha256": "53f776d3c6baae2e181aa0eb5706ce38c2ca84b81c21ea26c2d367eafbe26e2d"
+    },
+    {
+      "path": "src/plcnext_iot/devices/opcua.py",
+      "sha256": "e06a787ed99761263e2af2467978cfb54d91d210a9d3dfb5e1fc0ff24b9568a1"
+    },
+    {
+      "path": "src/plcnext_iot/devices/runtime.py",
+      "sha256": "fc00635804aacc60140787e37d66332bed27aa670ad255647a6374082e7908ec"
+    },
+    {
+      "path": "src/plcnext_iot/drivers/__init__.py",
+      "sha256": "4d6a796cef721d051504e47b0aaf1a7655b064fb22e2d9f0f070ea25c1ab3508"
+    },
+    {
+      "path": "src/plcnext_iot/drivers/modbus.py",
+      "sha256": "bd7b9ad45543062e12749873eb17f1ae0008900eccb3a6fa822b7aca486716c1"
+    },
+    {
+      "path": "src/plcnext_iot/drivers/opcua.py",
+      "sha256": "19fd1d3248160a47c9cdbabd41524ef6f1b1f7708d9b79e9f85c54edb1dc1f3a"
+    },
+    {
+      "path": "src/plcnext_iot/messaging/__init__.py",
+      "sha256": "3b2b83a21fc5956774f93d4d64389561d64a4a8769c06c6ee0565a33317a4581"
+    },
+    {
+      "path": "src/plcnext_iot/messaging/config_service.py",
+      "sha256": "25dd0f747c47e2d7c9652eb3486ae0d8f27dbfd1f453070f0aeae87e1cedda96"
+    },
+    {
+      "path": "src/plcnext_iot/messaging/health.py",
+      "sha256": "860e901b2216550b6e4756e69351b1d0af463e4a2a55ab492277d771801e42b9"
+    },
+    {
+      "path": "src/plcnext_iot/messaging/messages.py",
+      "sha256": "8149ad607e2e08a3dfd675ed7d4d4876bffecea7d5e7811d1b556acecac81bb9"
+    },
+    {
+      "path": "src/plcnext_iot/messaging/settings.py",
+      "sha256": "b6720258bf3073771850f8b730e8de1c6fa3606e1d1dd1193701515ca189bfc5"
+    },
+    {
+      "path": "src/plcnext_iot/messaging/transport.py",
+      "sha256": "431037ae28e8b1641688275cfe15770577fa4c6dd9e089937d014dea7c4402d8"
+    },
+    {
+      "path": "src/plcnext_iot/points/__init__.py",
+      "sha256": "cc70a0f1fdc76fd689399da0dfe695f8513b1c13cc811346b0d0c3739e3b4262"
+    },
+    {
+      "path": "src/plcnext_iot/points/events.py",
+      "sha256": "7f3368fd7617e9638b66b98820c0e0c5011a91d2d3fbfc1f47e195be664187be"
+    },
+    {
+      "path": "src/plcnext_iot/points/read_plan.py",
+      "sha256": "237d30bd184c389950028d457fbbf2016589e82df73b0aeb88106c0f09fac4ef"
+    },
+    {
+      "path": "src/plcnext_iot/points/samples.py",
+      "sha256": "2df12cd4ed34bacf859aff1ec0edcd7d5872e912f5cb398efd6d43cc8e4b1d06"
+    },
+    {
+      "path": "src/plcnext_iot/points/slots.py",
+      "sha256": "1537af20929fe948c00625f0e111474528cad6f9b79ef8299758f0f89afccf5b"
+    },
+    {
+      "path": "src/plcnext_iot/provisioning/devices.py",
+      "sha256": "81b2eab35072b750d4b31b015325915183c0e9aae8741d7c4989803788da264f"
+    },
+    {
+      "path": "src/plcnext_iot/provisioning/samples.py",
+      "sha256": "59efbe74baac760ea16829fb03449f9f82ebe374664f536516188f7830c52b98"
+    },
+    {
+      "path": "src/plcnext_iot/provisioning/server.py",
+      "sha256": "9e98724f594462caa9cf2af9663f7f99be45412910634f06af3b1b184418b063"
+    },
+    {
+      "path": "src/plcnext_iot/provisioning/store.py",
+      "sha256": "568e25f18df0819bd05da4b7eace89fd9e175439f52f10c50b53c8c0ddd09874"
+    },
+    {
+      "path": "src/plcnext_iot/reporting/__init__.py",
+      "sha256": "ddc8154994a991a756bd80fd4ee1842c1465a9d30f1b7e22aa76ac1d95c581bf"
+    },
+    {
+      "path": "src/plcnext_iot/reporting/accounting.py",
+      "sha256": "f2ccb5c716d686d0fe626eea9c4e67011b9e9a8e3f5e9b16e491f992ba794089"
+    },
+    {
+      "path": "src/plcnext_iot/reporting/audit.py",
+      "sha256": "5978cb755fcc867669fced14a1c83f6f8d6525eff09e3a35eee6eebab4930411"
+    },
+    {
+      "path": "src/plcnext_iot/reporting/engine.py",
+      "sha256": "909c56afb0c7947d2f38a99711c5f961587625c591e5b2c51b2614ea009ca8b1"
+    },
+    {
+      "path": "src/plcnext_iot/reporting/service.py",
+      "sha256": "334cb7dd9d5e4ab2b04a82f06461ebab3130eaae4510ec97b90dfbcb3090de3c"
+    },
+    {
+      "path": "src/plcnext_iot/storage/__init__.py",
+      "sha256": "11a43cd49af5af43fb6cea9a33a9576ea078303b297358e68b0296919f538a59"
+    },
+    {
+      "path": "src/plcnext_iot/storage/batch_repository.py",
+      "sha256": "2e5528e26e82bfa4074b56a50beaef7ae61d1a4a65cd2b1276b4a2e900fcd9dd"
+    },
+    {
+      "path": "src/plcnext_iot/storage/database.py",
+      "sha256": "fbe3ae11c9c0255a8c6cffbb1635dec1c0ae21776db98e5a04ba605af2ab8a0f"
+    },
+    {
+      "path": "src/plcnext_iot/storage/outbox.py",
+      "sha256": "2306108e011be179bb843ea8f147262bcd571f3e74de394231b44c587f714946"
+    },
+    {
+      "path": "src/plcnext_iot/storage/outbox_session.py",
+      "sha256": "5b53e03d9c0c5c282c7b47883b5c063e3b1c23e4464f4dd63f548689039fbe66"
+    },
+    {
+      "path": "src/plcnext_iot/storage/receiver.py",
+      "sha256": "34be7bc0f6711e03cb61d6fd6e75a8d97b846df1570b433c7df5ed5b399ec69e"
+    },
+    {
+      "path": "tests/test_boot_reload_identity.py",
+      "sha256": "ac94f422aaf7e5ad0c999e9e4a1f3c31d46d2a5b77f3c8f0f32896f06d823a4f"
+    },
+    {
+      "path": "tests/test_config_patch.py",
+      "sha256": "727637e08786e723df8e7a8e93f9d1ab9a62e91be19ba208e4666b5bb77c059a"
+    },
+    {
+      "path": "tests/test_config_store.py",
+      "sha256": "fb8f6b6d802dd4618b2b8da4e8f62f16e953e392bce569b1555cfefd603abff5"
+    },
+    {
+      "path": "tests/test_contract_schema_sharing.py",
+      "sha256": "3e8b5542a80b0417d295685c812f9620338e447149de6d4ab4bc6d20433a17ec"
+    },
+    {
+      "path": "tests/test_contracts.py",
+      "sha256": "949e4834689684b7344f4f41a3bb8ff9c33bf3e001b97a9590dca0db298f3db9"
+    },
+    {
+      "path": "tests/test_deployment.py",
+      "sha256": "e8ea397b1ad551c2939b8ec36db2e06a12851e364125a159643bc0acd8f0f3c0"
+    },
+    {
+      "path": "tests/test_images.py",
+      "sha256": "b7f957ba9f7e9ea487591e2ae0bd5ae086808015098a44b3c5baa987f07d07f1"
+    },
+    {
+      "path": "tests/test_lifecycle.py",
+      "sha256": "07207366d4e02ec59f7017d542cddeafb26556234a88ec9e5ef13beb47fe47b5"
+    },
+    {
+      "path": "tests/test_modbus.py",
+      "sha256": "ac77ac8bb865a4fb8f5cf018ce0a85bc63866285fe495d9c402edf915337597a"
+    },
+    {
+      "path": "tests/test_mqtt.py",
+      "sha256": "2e5af8cc678bb3bec04c29875c67b5aa3b3bbdb4c5a502fcf6cce2aeb8c255b3"
+    },
+    {
+      "path": "tests/test_opcua.py",
+      "sha256": "f8435533796c740b9490d75c20a8efa9f66f6dd764a7616a79cee1c16e379c3b"
+    },
+    {
+      "path": "tests/test_outbox.py",
+      "sha256": "4c8e14106dd2b102d50ec7066d1631d5be62b9fe7a1229faae3946d61543f06a"
+    },
+    {
+      "path": "tests/test_phase1_accounting.py",
+      "sha256": "136cfc539bd6d213fd699394714f216e1c4cee903d5faba6e23ffcf1142ec5c3"
+    },
+    {
+      "path": "tests/test_phase1_collectors.py",
+      "sha256": "aabccbba8c53865e7e43608ecb43ffcd95eb726eb4297d36aae635e4e87fa60d"
+    },
+    {
+      "path": "tests/test_phase1_events.py",
+      "sha256": "4ed4fc1cfd4947a6a8b94557e66e9262e5c756ccd67480d42cbb5303773e4978"
+    },
+    {
+      "path": "tests/test_phase1_outbox.py",
+      "sha256": "9ce0df00915fa9aeb63a0f2ba821e27e3ac2ed60f3b59c02dda1c57137d3b2cc"
+    },
+    {
+      "path": "tests/test_plcnext_apps.py",
+      "sha256": "bc230d9d728310268732232f6ea1c1277f3a21443582567e607b88a63e24159e"
+    },
+    {
+      "path": "tests/test_provisioning.py",
+      "sha256": "9cf0323ae90019c2ae45fa35a5d5cd1d4d80f9366997728cce932d885478c74c"
+    },
+    {
+      "path": "tests/test_provisioning_devices.py",
+      "sha256": "38923272d4f34abd3d716ee6d4ce998d61ce891996b2f39d25113ce15413c183"
+    },
+    {
+      "path": "tests/test_provisioning_samples.py",
+      "sha256": "c5c60ee0092f2262048da195c61a211a86afcd65bb6faa1b914d5c29e11333e7"
+    },
+    {
+      "path": "tests/test_receiver.py",
+      "sha256": "1e57c65d7cbc99be2fab6c39249b43b3e18702f9d6f1bf3d72b7c90985276a29"
+    },
+    {
+      "path": "tests/test_report_policy_clock.py",
+      "sha256": "fca529ed2f4e71150ed393a47134128bed0cce7f0a2939243b933f2d864ab0c9"
+    },
+    {
+      "path": "tests/test_reporting.py",
+      "sha256": "91b04646ed3bd89a40da57aeb8075e379b4137ede3ced88c431842f4809ea555"
+    },
+    {
+      "path": "tests/test_runtime_health.py",
+      "sha256": "fa4ff9c6cd2258082b963c79a588e1431a04fda92f784fc1e210f9f83f2b9c9a"
+    },
+    {
+      "path": "tests/test_telemetry_service.py",
+      "sha256": "56533d9cc3191d80e0a908d165776c20063a8056cab3320947dc68f82e223b8d"
+    },
+    {
+      "path": "tools/agent.py",
+      "sha256": "cb82375e71c09fa0a73085c60b1ba07c2d66843f45853d1ba5c1a8fc8bc36434"
+    },
+    {
+      "path": "tools/appliance.py",
+      "sha256": "79bb13ff52d681bbc44b83d6c9acc3cb7e1e67c45906d8762f7dc1b8a18cfabf"
+    },
+    {
+      "path": "tools/verify_existing_outbox.py",
+      "sha256": "abe01c7bade92feb8ffe1f837b50fec0704ebbca447f045b003536c1ff3d251b"
+    },
+    {
+      "path": "tools/verify_phase1_accounting.py",
+      "sha256": "704ca9ad1f3f9d686a645b273b135a8abdd0f4ca587adaf763a3aacab76b17e8"
+    }
+  ],
+  "measurements": [
+    {
+      "measurement": "selection_22500_injected",
+      "charged": 26548544,
+      "traced_current": 19033824,
+      "traced_peak": 19196386
+    },
+    {
+      "measurement": "G01_G02_injected_ACK_oracle",
+      "G01": {
+        "S": 1,
+        "P": 1,
+        "L": 1,
+        "I": 0,
+        "U": 1
+      },
+      "G02": {
+        "S": 2,
+        "P": 1,
+        "L": 1,
+        "I": 0,
+        "U": 0
+      },
+      "historicalFacts": {
+        "stored": 2,
+        "known_unsent": 1,
+        "isolated": 0,
+        "uncertain": 1,
+        "late_stored": 1,
+        "unknown_acks": 0,
+        "conflicting_acks": 0,
+        "enqueue_rejected_attempts": 0
+      },
+      "recorder": {
+        "accepted": 10,
+        "written": 10,
+        "rejected": 0,
+        "accountingComplete": true
+      },
+      "trace": "doc\\verification\\evidence\\2026-10-24-i05-i06\\same-run-correlation.jsonl"
+    },
+    {
+      "measurement": "production_audit_injected_ack",
+      "summary": {
+        "accepted": 5,
+        "written": 5,
+        "rejected": 0,
+        "accountingComplete": true
+      },
+      "facts": [
+        {
+          "kind": "captured",
+          "counterEpoch": "event-test",
+          "sampleSeq": 1,
+          "captureBootId": "event-test",
+          "gatewayId": "PLC-01",
+          "configVersion": 10,
+          "deviceId": "meter-A",
+          "pointId": "p0",
+          "eventKind": "PHYSICAL_RESULT",
+          "nominalPollDueMonoMs": 0,
+          "completedMonoMs": 10,
+          "originalUtcMs": 100010,
+          "value": 42.5,
+          "quality": "GOOD",
+          "nominalOriginMonoMs": 0,
+          "configGeneration": 0,
+          "timeGeneration": 0,
+          "timeValid": true,
+          "clockRevision": 3,
+          "timeSource": "HUB_MQTT"
+        },
+        {
+          "kind": "decision",
+          "counterEpoch": "event-test",
+          "sampleSeq": 1,
+          "selected": true,
+          "admitted": true,
+          "reason": null
+        },
+        {
+          "kind": "committed",
+          "counterEpoch": "event-test",
+          "messageId": "batch-5379dd5211f74cee954221c8b1cb2edf",
+          "payloadHash": "08a83787fa326d5ea8ac1c394974b61b0f39310db5107052bc523b1d5784a392",
+          "captureBootId": "event-test",
+          "sampleSeq": 1
+        },
+        {
+          "kind": "reserved",
+          "counterEpoch": "event-test",
+          "messageId": "batch-5379dd5211f74cee954221c8b1cb2edf",
+          "payloadHash": "08a83787fa326d5ea8ac1c394974b61b0f39310db5107052bc523b1d5784a392",
+          "captureBootId": "event-test",
+          "sampleSeq": 1,
+          "attempt": 1,
+          "category": "new"
+        },
+        {
+          "kind": "stored",
+          "counterEpoch": "event-test",
+          "messageId": "batch-5379dd5211f74cee954221c8b1cb2edf",
+          "payloadHash": "08a83787fa326d5ea8ac1c394974b61b0f39310db5107052bc523b1d5784a392",
+          "captureBootId": "event-test",
+          "sampleSeq": 1
+        }
+      ]
+    }
+  ]
+}

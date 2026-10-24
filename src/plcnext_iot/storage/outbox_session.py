@@ -23,8 +23,10 @@ class BatchState:
 
 
 class OutboxSession:
-    def __init__(self, *, clock=time.monotonic, max_bytes=4*1024*1024, max_records=10000, on_fact=None):
+    def __init__(self, *, clock=time.monotonic, max_bytes=4*1024*1024, max_records=10000, on_fact=None,accounting=None):
         self.clock, self.max_bytes, self.max_records = clock, max_bytes, max_records
+        self.accounting=accounting
+        if accounting is not None:self.max_bytes-=accounting.max_metadata_bytes
         self.entries = {}
         self.staged = {}
         self.watermark = 0
@@ -83,6 +85,7 @@ class OutboxSession:
             entry.ever_sent = row['attempts']>0
             self.entries[key] = entry
             self.accounting_complete = False
+            if self.accounting is not None:self.accounting.restored(entry)
         for key in list(self.entries):
             if key not in ids:
                 self.accounting_complete=False
@@ -94,6 +97,8 @@ class OutboxSession:
             entry.category = 'history'
 
     def emit(self, kind, key, entry, **extra):
+        if self.accounting is not None and kind in ('reserved','sdk_rejected','retryable_reject','conflict'):
+            self.accounting.record_batch(kind,entry,**extra)
         if self.on_fact is not None:
             try:
                 result=self.on_fact(dict(kind=kind,message_id=key,hash=entry.row['hash'],
@@ -111,6 +116,7 @@ class OutboxSession:
         entry.source, entry.active = source, False
         fact = 'isolated' if source=='PERMANENT_REJECT' else 'uncertain' if entry.ever_sent else 'known_unsent'
         self.add_fact(fact,len(entry.events))
+        if self.accounting is not None:self.accounting.terminal(entry,source)
         self.emit('terminal',key,entry,source=source,outcome=fact)
 
     def unknown_ack(self):

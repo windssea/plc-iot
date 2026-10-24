@@ -121,6 +121,7 @@ class ReportEngine:
         if (sample.gateway_id!=self.gateway or not self.snapshot or sample.config_version != self.snapshot.config_version
                 or key not in self.points or (self.generation is not None and sample.config_generation != self.generation)):
             self.discarded += 1
+            self.boot_context.accounting.undecided(sample,'VERSION_DISCARD')
             return False
         if (sample.capture_boot_id is None or sample.sample_seq is None
                 or sample.completed_mono_ms is None or sample.nominal_origin_mono_ms is None):
@@ -162,17 +163,23 @@ class ReportEngine:
             if q >= due:
                 count = (q - due) // point.report_interval_ms + 1
                 self.missed_report_slots += count - 1
+                self.boot_context.accounting.add('missedReportSlotsTotal',count-1)
                 self.next_report_due[key] = due + count * point.report_interval_ms
                 selected = True
         if not selected:
             self.policy_filtered_events += 1
+            self.boot_context.accounting.decided(sample,selected=False)
             return False
         self.eligible_events += 1
         if sample.timestamp is None or not (sample.time_valid or sample.time_source == 'SYSTEM_RTC_COMPAT'):
             self.time_invalid_events += 1; self.known_unsent_events += 1
+            self.boot_context.accounting.decided(sample,selected=True,reason='TIME_INVALID')
             return False
         if not self._can_admit(sample):
             self.admission_rejected_events += 1; self.known_unsent_events += 1
+            self.boot_context.accounting.decided(sample,selected=True,reason='CAPACITY_EVICTION')
+            return False
+        if not self.boot_context.accounting.decided(sample,selected=True,admitted=True):
             return False
         self._owned[self._identity(sample)] = sample
         self._retain(sample)
@@ -209,10 +216,11 @@ class ReportEngine:
                     break
                 pending.append(sample); seen.add(key); size += length; limit = min(limit, sample_limit)
             sequence = self.boot_context.next_sequence()
+            message_id='batch-'+uuid.uuid4().hex
             values = [dict(deviceId=s.device_id, pointId=s.point_id, timestamp=s.timestamp,
                            value=s.value, quality=s.quality) for s in pending]
             payload = encode(dict(schemaVersion=1, gatewayId=self.gateway, timestamp=wall_ms,
-                messageId='batch-' + uuid.uuid4().hex, bootId=self.boot_id, sequence=sequence,
+                messageId=message_id, bootId=self.boot_id, sequence=sequence,
                 configVersion=pending[0].config_version, values=values))
             if len(payload) > 131072:
                 raise ValueError('Telemetry batch exceeds byte limit')
@@ -221,6 +229,7 @@ class ReportEngine:
                 break
             batch = ReportBatch(payload, pending[0].config_version, tuple(pending), now, sequence)
             self._frozen[sequence] = batch
+            self.boot_context.accounting.materialized(sequence,message_id)
             self._classes[sequence] = category
             self.used_bytes += charge
             self._prefer_new = category != 'new'
@@ -264,6 +273,7 @@ class ReportEngine:
     def abandon(self):
         """Producer stopped, no enqueue in progress: remaining RAM is known unsent."""
         count = len(self._owned)
+        self.boot_context.accounting.abandon(list(self._owned.values()),tuple(self._frozen))
         self.known_unsent_events += count
         for sample in self._owned.values():
             self._forget(sample)

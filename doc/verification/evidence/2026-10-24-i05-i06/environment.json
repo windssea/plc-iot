@@ -1,0 +1,24 @@
+{
+  "checkedAt": "2026-10-24T06:17:16.1185637Z",
+  "backendCount": 1,
+  "backendPids": [
+    34208
+  ],
+  "listeners": [
+    {
+      "LocalPort": 8080,
+      "OwningProcess": 34208
+    },
+    {
+      "LocalPort": 8090,
+      "OwningProcess": 4088
+    }
+  ],
+  "resourceRecorderCount": 0,
+  "databaseCreated": false,
+  "existingSqlite": "D:/work/code/PLCnext-iot/.local/setup-preview/telemetry.db",
+  "existingDevelopmentPostgresqlUsed": true,
+  "deviceOperations": false,
+  "servicesSwitched": false,
+  "runtimeJarSha256": "34f1a01e324f1911e0cb2527e96130eefc7bed67a5ac13a31d6b626fefd25cd1"
+}

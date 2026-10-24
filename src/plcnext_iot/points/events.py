@@ -61,6 +61,7 @@ class PointEvents:
             self.samples.version_discarded_events += 1
             self.samples.undecided_lost_events += 1
             self.samples.accounting_complete = False
+            self.samples.boot_context.accounting.undecided(sample,'VERSION_DISCARD')
         return sample
 
     def result(self, context, point, value, quality, nominal, completed, *, publish=True):

@@ -1,0 +1,14 @@
+{
+  "gatewayId": "PLC-UI-DEMO",
+  "prefix": "i06-a0adc56465744921a73ef73fb068ca5b",
+  "source": "SYNTHETIC_INPUT_NO_DEVICE",
+  "messageId": "i06-a0adc56465744921a73ef73fb068ca5b-persistent",
+  "parent": 820035378588677032,
+  "broker": 820035378588677033,
+  "gateway": 820035378588677034,
+  "release": 820035378588677035,
+  "device": 820035378588677036,
+  "variable": 820035378588677037,
+  "assetsBefore": 65,
+  "tasksBefore": 60
+}

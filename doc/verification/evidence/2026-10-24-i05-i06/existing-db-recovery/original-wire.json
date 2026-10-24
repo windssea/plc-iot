@@ -1,0 +1,1 @@
+{"schemaVersion":1,"gatewayId":"PLC-UI-DEMO","timestamp":1792822153320,"messageId":"i06-a0adc56465744921a73ef73fb068ca5b-persistent","bootId":"i06-a0adc56465744921a73ef73fb068ca5b-old","sequence":1,"configVersion":1,"values":[{"deviceId":"i06-meter","pointId":"p0","timestamp":1792822153320,"value":42.5,"quality":"GOOD"}]}

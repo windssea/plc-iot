@@ -27,7 +27,7 @@ class TelemetryPipeline:
         self.engine=ReportEngine(gateway,context.boot_id,boot_context=context)
         self.context=context
         if context.outbox_session is None:
-            context.outbox_session=OutboxSession(on_fact=on_fact)
+            context.outbox_session=OutboxSession(on_fact=on_fact,accounting=context.accounting)
         elif on_fact is not None:
             context.outbox_session.on_fact=on_fact
         self.session=context.outbox_session
@@ -80,6 +80,7 @@ class TelemetryPipeline:
             if self.engine._identity(sample) not in self.engine._owned:
                 self.samples.undecided_lost_events+=1
             self.samples.accounting_complete=False
+            self.context.accounting.undecided(sample,'STORAGE_ERROR')
             raise
         if self.engine.discarded!=discarded:
             self.samples.version_discarded_events+=1
@@ -112,7 +113,12 @@ class TelemetryPipeline:
             args=(batch.payload,time.time())
             if hasattr(self,'session'):
                 args+= (dict(events=tuple(s.sample_seq for s in batch.samples),capture_boot=self.engine.boot_id),)
-            if await self.storage.call('enqueue',*args):
+            try:
+                accepted=await self.storage.call('enqueue',*args)
+            except WorkerFull:
+                if hasattr(self,'context'):self.context.accounting.add('enqueueRejectedAttemptsTotal')
+                raise
+            if accepted:
                 self.engine.committed(batch,asyncio.get_running_loop().time())
                 self.engine._prefer_commit_new=category!='new'
 
@@ -132,6 +138,7 @@ class TelemetryPipeline:
                 await asyncio.sleep(.025)
         except Exception:
             self.last_error='TELEMETRY_STORE_FAILED';self._failed.set()
+            self.context.accounting.incomplete()
 
     async def _run(self):
         try:
@@ -161,6 +168,7 @@ class TelemetryPipeline:
         except Exception:
             self.last_error='TELEMETRY_REPORT_FAILED'
             self._failed.set()
+            self.context.accounting.incomplete()
 
     async def send_loop(self,connection,topic):
         watermark=self.context._sample_sequence
@@ -198,6 +206,7 @@ class TelemetryPipeline:
                             # No await between recheck and SDK acceptance.
                             if hasattr(connection,'submit_publish'):
                                 info=connection.submit_publish(topic,payload)
+                                self.context.accounting.record('sdk_accepted',messageId=key)
                                 task=asyncio.create_task(connection.wait_puback(info))
                             else:
                                 task=asyncio.create_task(connection.publish(topic,payload))
@@ -235,7 +244,14 @@ class TelemetryPipeline:
                     enqueue_attempt_failures=self.enqueue_attempt_failures,
                     shutdown_volatile_events=self.shutdown_volatile_events,
                     shutdown_unsettled_events=self.shutdown_unsettled_events,
-                    outbox_stats_cached=True)
+                    outbox_stats_cached=True,diagnostics=self.diagnostics_snapshot())
+
+    def diagnostics_snapshot(self):
+        if not self.session.accounting_complete:self.context.accounting.incomplete()
+        if self.session.detail_truncated:self.context.accounting.incomplete(truncated=True)
+        if self.session.counter_overflow:self.context.accounting.incomplete(overflow=True)
+        return dict(self.context.accounting.snapshot(),gatewayId=self.engine.gateway,bootId=self.context.boot_id,
+                    timeMode='SYSTEM_RTC_COMPAT_UNVERIFIED')
 
     async def wait_failed(self):
         await self._failed.wait()

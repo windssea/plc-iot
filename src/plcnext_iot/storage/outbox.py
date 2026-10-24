@@ -1,6 +1,7 @@
 """Immutable v1 payload storage, monotonic retry, bounded same-run correlation."""
 import hashlib
 import json
+from pathlib import Path
 
 from plcnext_iot.contracts import validate_message
 from plcnext_iot.config.store import StoreFormatError
@@ -20,6 +21,8 @@ class OutboxStore(Database):
         self._injected = repository is not None
         if repository is None:
             SqlBatches.preflight(path)
+            if self.session.accounting is not None and Path(path).exists():
+                self.session.accounting.recovery()
             super().__init__(path,gateway,0x504F5554,{'batches':'''CREATE TABLE batches(
                 message_id TEXT PRIMARY KEY,payload BLOB NOT NULL,hash TEXT NOT NULL,
                 created REAL NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,next_due REAL NOT NULL DEFAULT 0,
@@ -55,6 +58,7 @@ class OutboxStore(Database):
         for _,key in sorted(dead)[:max(0,len(dead)-self.max_dead)]:
             entry = self.session.entries[key]
             self.repo.prune(key)
+            if self.session.accounting is not None:self.session.accounting.removed(entry,pruned=True)
             del self.session.entries[key]
             self.session.emit('pruned',key,entry)
             self.session.detail_truncated = True
@@ -78,6 +82,7 @@ class OutboxStore(Database):
         self.session.terminal(key,source)
         for old in pruned:
             entry=self.session.entries.pop(old)
+            if self.session.accounting is not None:self.session.accounting.removed(entry,pruned=True)
             self.session.emit('pruned',old,entry)
             self.session.detail_truncated=True
 
@@ -92,8 +97,9 @@ class OutboxStore(Database):
         self._expire(now)
         entries = self.session.entries
         if len(entries)>=self.max_batches or sum(e.row['size'] for e in entries.values())+len(payload)>self.max_bytes:
-            self.repo.count_attempt('dropped')
             self.session.add_fact('enqueue_rejected_attempts')
+            if self.session.accounting is not None:self.session.accounting.add('enqueueRejectedAttemptsTotal')
+            self.repo.count_attempt('dropped')
             return False
         row = dict(message_id=key,hash=hashlib.sha256(payload).hexdigest(),created=now,size=len(payload),
                    attempts=0,next_due=0,state='PENDING',reason=None,
@@ -103,11 +109,17 @@ class OutboxStore(Database):
         category = 'history' if events and max(events)<=self.session.watermark else 'new'
         entry = self.session.stage(key,row,events,association.get('capture_boot'),category)
         if entry is None:
+            if self.session.accounting is not None:self.session.accounting.add('enqueueRejectedAttemptsTotal')
             return False
-        self.repo.insert(row,payload)
+        try:
+            self.repo.insert(row,payload)
+        except Exception:
+            if self.session.accounting is not None:self.session.accounting.add('enqueueRejectedAttemptsTotal')
+            raise
         entry.row = row
         self.session.staged.pop(key)
         entries[key] = entry
+        if self.session.accounting is not None:self.session.accounting.committed(entry)
         self.session.emit('committed',key,entry)
         return True
 
@@ -141,6 +153,8 @@ class OutboxStore(Database):
         e=min(eligible[category],key=lambda e:e.row['local_order']); key=e.row['message_id']
         payload=self.repo.payload(key)
         if payload is None or hashlib.sha256(payload).hexdigest()!=e.row['hash'] or validate_message('data',payload,expected_gateway_id=self.gateway):
+            session.accounting_complete=False
+            if session.accounting is not None:session.accounting.incomplete()
             raise StoreFormatError('Stored telemetry batch is corrupt')
         if sum(size for _,size in session.rate)+len(payload)>512*1024:
             return None
@@ -175,6 +189,7 @@ class OutboxStore(Database):
                 session.emit('conflict',key,e)
                 return False
             self.repo.delete(key)
+            if session.accounting is not None:session.accounting.removed(e,stored=True)
             session.add_fact('stored',len(e.events))
             if e.source=='AGE_EXPIRED':
                 session.add_fact('late_stored',len(e.events))

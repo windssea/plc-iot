@@ -35,7 +35,7 @@ async def _watch_reload(stop, server, seq, run_stop):
             return
 
 
-async def _supervise(store, server, stop):
+async def _supervise(store, server, stop, *, audit_recorder=None):
     """Run the agent, restarting it only when a saved revision asks for it.
 
     The record is the sole trigger: a revision that no one saved never restarts
@@ -43,6 +43,7 @@ async def _supervise(store, server, stop):
     the restart decision to the container's supervisor) instead of spinning.
     """
     boot_context = ProcessBootContext()
+    if audit_recorder is not None:boot_context.accounting.attach_recorder(audit_recorder)
     while True:
         value = server.value
         if value is None:
@@ -85,7 +86,7 @@ async def _supervise(store, server, stop):
                               seq=server.change_seq)), flush=True)
 
 
-async def serve(directory, host, port, tls=None):
+async def serve(directory, host, port, tls=None, *, audit_file=None):
     store = SetupStore(directory)
     lock = StoreLock(store.directory/'commissioning.lock')
     server = None
@@ -93,6 +94,7 @@ async def serve(directory, host, port, tls=None):
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     waits = []
+    recorder=None;recorder_closed=False
     try:
         value = store.load()
         server = SetupServer(store, value)
@@ -109,8 +111,18 @@ async def serve(directory, host, port, tls=None):
         waits = []
         if stop.is_set():
             return 0
-        return await _supervise(store, server, stop)
+        if audit_file is not None:
+            from plcnext_iot.reporting.audit import AuditRecorder
+            recorder=AuditRecorder(audit_file)
+        result=await _supervise(store,server,stop,**({'audit_recorder':recorder} if recorder is not None else {}))
+        if recorder is not None:
+            summary=await asyncio.to_thread(recorder.close);recorder_closed=True
+            print(json.dumps(dict(event='audit_stopped',**summary)),flush=True)
+            if not summary['accountingComplete']:result=1
+        return result
     finally:
+        if recorder is not None and not recorder_closed:
+            recorder.close()
         stop.set()
         for task in waits:
             task.cancel()
@@ -129,6 +141,7 @@ def main():
     parser.add_argument('--port',type=int,default=8080)
     parser.add_argument('--cert',type=Path)
     parser.add_argument('--key',type=Path)
+    parser.add_argument('--audit-file',type=Path,help='Exclusive bounded JSONL evidence across local reloads')
     args = parser.parse_args()
     if not 0 <= args.port <= 65535 or bool(args.cert) != bool(args.key):
         parser.error('Invalid port or TLS certificate/key pair')
@@ -137,7 +150,8 @@ def main():
         tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         tls.load_cert_chain(args.cert,args.key)
     try:
-        return asyncio.run(serve(args.data_directory,args.listen,args.port,tls))
+        return asyncio.run(serve(args.data_directory,args.listen,args.port,tls,
+                                **({'audit_file':args.audit_file} if args.audit_file is not None else {})))
     except (OSError, ValueError, RuntimeError):
         print(json.dumps(dict(event='appliance_failed',code='STARTUP_OR_STORAGE_ERROR')),flush=True)
         return 1

@@ -1,0 +1,12 @@
+[
+  {
+    "raw": "{\"schemaVersion\":1,\"gatewayId\":\"PLC-UI-DEMO\",\"timestamp\":1792822163960,\"messageId\":\"i06-a0adc56465744921a73ef73fb068ca5b-persistent\",\"status\":\"STORED\",\"errors\":[]}",
+    "retained": false,
+    "receivedMono": 277644.968
+  },
+  {
+    "raw": "{\"schemaVersion\":1,\"gatewayId\":\"PLC-UI-DEMO\",\"timestamp\":1792822164524,\"messageId\":\"i06-a0adc56465744921a73ef73fb068ca5b-persistent\",\"status\":\"STORED\",\"errors\":[]}",
+    "retained": false,
+    "receivedMono": 277645.531
+  }
+]

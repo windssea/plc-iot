@@ -149,6 +149,11 @@ class SetupServer:
                                    changeSeq=self.change_seq, appliedSeq=self.applied_seq)
         if method == 'GET' and path == '/api/config':
             return 200, None, self._public()
+        if method == 'GET' and path == '/api/diagnostics/buffer':
+            telemetry=getattr(self._runtime_agent,'telemetry',None)
+            if telemetry is None:
+                return 503,None,dict(code='DIAGNOSTICS_UNAVAILABLE')
+            return 200,None,telemetry.diagnostics_snapshot()
         if (method == 'GET' and path.startswith('/api/devices/')
                 and re.fullmatch(r'/api/devices/[^/]+/samples', urlsplit(path).path)):
             return self._samples(path)

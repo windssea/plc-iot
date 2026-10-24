@@ -21,6 +21,8 @@ class ProcessBootContext:
         self.outbox_session = None
         self.telemetry_closing = None
         self.telemetry_owner = None
+        from plcnext_iot.reporting.accounting import Accounting
+        self.accounting=Accounting(self.boot_id)
 
     @property
     def sequence(self):

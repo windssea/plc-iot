@@ -134,7 +134,12 @@ class CollectorTests(unittest.IsolatedAsyncioTestCase):
             finally:await runner.stop()
         self.assertEqual([s.quality for s in physical],['GOOD']*3)
         q=[s.nominal_poll_due_mono_ms for s in physical]
-        self.assertEqual([b-a for a,b in zip(q,q[1:])],[20,20])
+        deltas=[b-a for a,b in zip(q,q[1:])]
+        # Windows may deschedule the loop across a real slot. Verify the grid
+        # and the corresponding missed-slot evidence, not wall-clock punctuality.
+        self.assertTrue(all(delta>=20 and delta%20==0 for delta in deltas))
+        self.assertGreaterEqual(samples.missed_poll_cycles,sum(delta//20-1 for delta in deltas))
+        self.assertEqual(samples.boot_context.accounting.snapshot()['counters']['missedPollCyclesTotal'],samples.missed_poll_cycles)
         self.assertEqual(physical[0].nominal_origin_mono_ms,q[0])
         self.assertEqual(samples.captured_events,4)
 

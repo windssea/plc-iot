@@ -1,0 +1,38 @@
+{
+  "documents": 8,
+  "localLinks": 90,
+  "missing": [],
+  "pythonFilesParsed": 78,
+  "pythonSyntax": "PASS",
+  "sharedContracts": [
+    {
+      "file": "protocol.schema.json",
+      "iotSha256": "d65c133d44a02072972361a4c601ca3b22bf0ab1125f6d63d48ca47b65a830e9",
+      "hubSha256": "d65c133d44a02072972361a4c601ca3b22bf0ab1125f6d63d48ca47b65a830e9",
+      "same": true
+    },
+    {
+      "file": "topics.json",
+      "iotSha256": "f80f367dd34def81ba86a0a2eb370869bf99de1f25ceadfc986ca004da308d51",
+      "hubSha256": "f80f367dd34def81ba86a0a2eb370869bf99de1f25ceadfc986ca004da308d51",
+      "same": true
+    }
+  ],
+  "canonicalUnchanged": true,
+  "canonicalSha256": "7d7425b4ebe2e17cbc9fb283a59bd0f59be1ba48d24dda078977dde9d421b91f",
+  "v1BatchDDLUnchanged": true,
+  "staleIsolatedTestSources": [],
+  "staleRecoverySources": [],
+  "tests": 152,
+  "prohibitedAttempts": [],
+  "logicalDatabaseRestored": true,
+  "softwareCrashExits": 4,
+  "realStoredAcks": 2,
+  "hubReceipts": 1,
+  "hubRows": 1,
+  "cleanup": {
+    "assets": 65,
+    "collectTasks": 60,
+    "remainingOwnedRows": 0
+  }
+}

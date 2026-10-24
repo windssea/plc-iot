@@ -4,11 +4,11 @@
 
 当前交付为 **0.2.0**：独立 Agent 已形成可运行闭环。新增设备级 MQTT `config/patch` 入口，支持按设备增量操作和首次空网关引导；`config/set` 完整快照作为兼容入口保留。采集结果按报告策略写入 Outbox，经 `data` / `data/ack` 上报和补传。
 
-当前工作区已完成 [I01/I02 采集与入口选择](doc/verification/2026-10-24-i01-i02.md)及 [I03/I04 异步存储交接、配额、公平调度与 ACK 对账](doc/verification/2026-10-24-i03-i04.md)的代码和隔离验证；130 项受约束测试通过。OPC UA 使用计划读取，入口满拒绝新事件，重连保留单调退避；尚未更新运行 Agent/镜像。I05/I06、实际 SQLite/磁盘恢复和真实交付验收待完成。无数据库/设备连接的当前复现入口为 `.venv/Scripts/python.exe tools/verify_phase1_outbox.py`；旧 I01/I02 报告对应其已提交源码快照。
+当前工作区已完成三方阶段 1 Python I01～I06 的开发验证，最新结果见 [I05/I06 报告](doc/verification/2026-10-24-i05-i06.md)：152 项受约束隔离测试通过，另在原有开发 SQLite 和现有 Hub/开发 PostgreSQL 验证真实 STORED、原字节恢复、去重及删除后不复活。统一 16 项计数、逻辑快照、本地诊断 API 和有界独立记录器已接入；尚未更新运行 Agent/镜像。平台授时、新诊断 Topic、设备/物理断电及完整负载验收仍待完成。隔离入口为 `.venv/Scripts/python.exe tools/verify_phase1_accounting.py`，实际库验证的适用条件和清理范围见报告；[I01/I02](doc/verification/2026-10-24-i01-i02.md)、[I03/I04](doc/verification/2026-10-24-i03-i04.md) 保留各自已提交源码的历史证据。
 
-已完成：契约 v1、配置事务与重启恢复、Modbus TCP 批量只读采集、OPC UA 只读采集、MQTT 配置 ACK、遥测补传、去重接收端、设备状态/心跳、浏览器初始化、多架构镜像和未签名 WBM 开发包。既有版本已与 PLCnext-mock-device、独立 Mosquitto 联调，本轮源码变化只完成所列隔离测试。
+已完成：契约 v1、配置事务与重启恢复、Modbus TCP 批量只读采集、OPC UA 只读采集、MQTT 配置 ACK、遥测补传、去重接收端、设备状态/心跳、浏览器初始化、多架构镜像和未签名 WBM 开发包。既有版本已与 PLCnext-mock-device、独立 Mosquitto 联调；本轮新增代码完成所列隔离与现有开发库/真实 Hub 的批次恢复验证，没有启动运行 Agent 或操作设备。
 
-尚未完成：Hub 对接、PLC / WBM 真机安装、OPC UA `Sign`/`SignAndEncrypt` 证书、南向 MQTT、写设备命令、OTA、契约中的 `event` Topic 发布。心跳里的 `agentVersion` 现为 `0.2.0`。
+尚未完成：运行 Agent 到 Hub 的设备全链路交付、平台授时/新诊断线上接入、PLC / WBM 真机安装、OPC UA `Sign`/`SignAndEncrypt` 证书、南向 MQTT、写设备命令、OTA、契约中的 `event` Topic 发布。心跳里的 `agentVersion` 现为 `0.2.0`。
 
 ## 已有内容
 

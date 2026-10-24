@@ -58,6 +58,7 @@ async def run(settings, configs, run_seconds, driver='none', mqtt_settings=None,
             telemetry=TelemetryPipeline(runtime,samples,settings.data_directory,settings.gateway_id,
                 boot_id=context.boot_id,boot_context=context,
                 on_sample=None if quiet_samples else lambda sample: _emit('sample',agent,sample=asdict(sample),droppedSamples=samples.dropped))
+            agent.telemetry=telemetry
             await telemetry.start()
             mqtt_service = MqttConfigService(agent,mqtt_settings,telemetry=telemetry)
             await mqtt_service.start()
@@ -134,6 +135,7 @@ def main():
     parser.add_argument('--driver', choices=('none', 'modbus-tcp', 'opcua', 'all'), default='none')
     parser.add_argument('--mqtt',type=Path,help='Optional separate MQTT settings JSON')
     parser.add_argument('--quiet-samples', action='store_true', help='Suppress per-point diagnostic logs; telemetry is unaffected')
+    parser.add_argument('--audit-file',type=Path,help='Exclusive bounded JSONL capture/decision/Outbox evidence file')
     parser.add_argument("--run-seconds", type=float, help="Optional local smoke-test duration; 0 stops after configuration")
     args = parser.parse_args()
     if args.run_seconds is not None and (not math.isfinite(args.run_seconds) or args.run_seconds < 0):
@@ -147,7 +149,22 @@ def main():
     except ValueError:
         print(json.dumps({"event": "bootstrap_failed", "code": "INVALID_BOOTSTRAP"}))
         return 2
-    return asyncio.run(run(settings, args.config, args.run_seconds, args.driver, mqtt_settings, args.quiet_samples))
+    context=ProcessBootContext()
+    recorder=None
+    try:
+        if args.audit_file is not None:
+            from plcnext_iot.reporting.audit import AuditRecorder
+            try:recorder=AuditRecorder(args.audit_file)
+            except (OSError,ValueError):
+                print(json.dumps(dict(event='audit_failed',code='AUDIT_OPEN_ERROR')),flush=True)
+                return 1
+            context.accounting.attach_recorder(recorder)
+        result=asyncio.run(run(settings,args.config,args.run_seconds,args.driver,mqtt_settings,args.quiet_samples,boot_context=context))
+    finally:
+        if recorder is not None:
+            summary=recorder.close()
+            print(json.dumps(dict(event='audit_stopped',**summary)),flush=True)
+    return 1 if recorder is not None and not summary['accountingComplete'] else result
 
 
 if __name__ == "__main__":

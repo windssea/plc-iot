@@ -84,6 +84,7 @@ class OpcUaRunner:
     def _missed(self, count):
         self.skipped_polls += count
         self.samples.missed_poll_cycles += count
+        self.samples.boot_context.accounting.add('missedPollCyclesTotal',count)
 
     def _retired_at(self, context):
         if context != self.runtime.sample_context(self.device.device_id,self):

@@ -93,13 +93,19 @@ class SampleBuffer:
         except ValueError:
             self.counter_overflow = True
             self.accounting_complete = False
+            self.boot_context.accounting.incomplete(overflow=True)
             raise
-        sample = Sample(version, device, point, clock.utc_ms, value, quality, completed,
-                        self.boot_context.boot_id, sequence,
-                        nominal_ms, completed_ms, kind, round(origin * 1000), generation,
-                        clock.generation, clock.time_valid, clock.clock_revision, clock.source,
-                        gateway_id or self.gateway_id)
+        try:
+            sample = Sample(version, device, point, clock.utc_ms, value, quality, completed,
+                            self.boot_context.boot_id, sequence,
+                            nominal_ms, completed_ms, kind, round(origin * 1000), generation,
+                            clock.generation, clock.time_valid, clock.clock_revision, clock.source,
+                            gateway_id or self.gateway_id)
+        except (ValueError,TypeError,OverflowError):
+            self.accounting_complete=False;self.boot_context.accounting.incomplete()
+            raise
         self.captured_events += 1
+        self.boot_context.accounting.captured(sample)
         return sample
 
     def put(self, sample):
@@ -115,6 +121,7 @@ class SampleBuffer:
             self.undecided_lost_events += 1
             self.accounting_complete = False
             self.last_overflow_identity = (sample.capture_boot_id, sample.sample_seq)
+            self.boot_context.accounting.undecided(sample,'CAPTURE_OVERFLOW',overflow=True)
             return False
         self._queue.put_nowait(sample)
         self.used_bytes += charge

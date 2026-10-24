@@ -146,3 +146,4 @@ class ModbusRunner:
     def _missed(self, count):
         self.skipped_polls += count
         self.samples.missed_poll_cycles += count
+        self.samples.boot_context.accounting.add('missedPollCyclesTotal',count)

@@ -24,6 +24,7 @@ from plcnext_iot.storage.batch_repository import SqlBatches
 
 ROOT=Path(__file__).resolve().parents[1]
 MEASUREMENTS=[]
+EVIDENCE_OUTPUT=ROOT/'doc/verification/evidence/2026-10-24-i03-i04'
 
 
 class Clock:
@@ -310,7 +311,7 @@ class OutboxPolicyTests(unittest.TestCase):
         self.assertTrue(self.store.acknowledge(ack('u')))
         g2=oracle.partition((1,2,3,4),stored=(1,4),pending=(2,),lost=(3,),uncertain=(4,))
         self.assertEqual(g2,dict(S=2,P=1,L=1,I=0,U=0))
-        out=ROOT/'doc/verification/evidence/2026-10-24-i03-i04'
+        out=EVIDENCE_OUTPUT
         out.mkdir(parents=True,exist_ok=True)
         trace=out/'same-run-correlation.jsonl'
         # Recorder opens exclusively; remove only this test's prior evidence.
@@ -407,6 +408,9 @@ class PipelineIsolationTests(unittest.IsolatedAsyncioTestCase):
             await until(lambda:pipeline.engine.eligible_events==30)
             stats=await asyncio.wait_for(pipeline.stats(),.1)
             self.assertEqual(stats['selected_pending_events'],30)
+            self.assertEqual(stats['diagnostics']['buffer']['pendingEvents'],30)
+            self.assertEqual(stats['diagnostics']['counters']['eligibleEventsTotal'],30)
+            self.assertEqual(stats['diagnostics']['decisionPending'],0)
             self.assertEqual(pipeline.engine.known_unsent_events,0)
             self.assertEqual(pipeline.storage.jobs,1)
         finally:
