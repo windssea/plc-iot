@@ -28,11 +28,11 @@ async def run(settings, configs, run_seconds, driver='none', mqtt_settings=None,
     if boot_id is not None and boot_id != context.boot_id:
         raise ValueError('Agent boot identity does not match its process context')
     from plcnext_iot.points.samples import SampleBuffer
-    samples = SampleBuffer()
+    samples = SampleBuffer(boot_context=context,gateway_id=settings.gateway_id)
     if driver == 'none':
-        runtime = DeviceRuntime()
+        runtime = DeviceRuntime(boot_context=context)
     else:
-        runtime = DeviceRuntime(lambda device: bind(runtime, samples, DRIVERS[driver])(device))
+        runtime = DeviceRuntime(lambda device: bind(runtime, samples, DRIVERS[driver])(device),boot_context=context)
     agent = AgentLifecycle(settings, runtime)
     async def emit_samples():
         while True:

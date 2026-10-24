@@ -1,10 +1,11 @@
-"""Read-only OPC UA session and subscription; no MQTT or SQLite."""
+"""Read-only scheduled OPC UA results; no MQTT or SQLite."""
 import asyncio
 import math
 import os
 
 from asyncua import Client, ua
 from asyncua.ua.uaerrors import UaError, UaStatusCodeError
+from plcnext_iot.points.slots import skipped_after
 
 
 RANGES = {
@@ -89,18 +90,14 @@ class OpcUaReader:
         except (OSError, UaError, asyncio.CancelledError):
             pass
 
-    async def run(self, emit):
-        """Connect, subscribe, and dispatch until the session is lost or cancelled."""
+    async def run(self, emit, *, before_read=None, skipped=None, deadlines=None, retired_at=None, refresh_plan=None):
+        """Connect and read nominal slots until the session is lost or cancelled."""
         connection = self.connection
         if connection.security_policy != 'None' or connection.security_mode != 'None':
-            for point in self.points:
-                emit(point, None, 'BAD_CONFIGURATION')
             raise RuntimeError('BAD_CONFIGURATION')
         if connection.username:
             password = os.environ.get(connection.password_env or '')
             if not password:
-                for point in self.points:
-                    emit(point, None, 'BAD_CONFIGURATION')
                 raise RuntimeError('BAD_CONFIGURATION')
         self._lost = asyncio.Event()
         timeout = connection.request_timeout_ms / 1000
@@ -114,10 +111,31 @@ class OpcUaReader:
         client.connection_lost_callback = on_lost
         self._client = client
         last_error = None
+        enabled = tuple(p for p in self.points if p.enabled)
+        loop = asyncio.get_running_loop()
+        next_read = deadlines if deadlines is not None else {p.point_id: loop.time() for p in enabled}
+        initial = {p.point_id: (before_read(p, next_read[p.point_id], dict(next_read))
+                               if before_read else None) for p in enabled}
+        connected = False
+        def advance(point, nominal, context):
+            missed = skipped_after(nominal,loop.time(),point.poll_interval_ms/1000,
+                retired_at=retired_at(context) if retired_at else None)
+            if skipped is not None:
+                skipped(missed)
+            next_read[point.point_id] = nominal + (missed + 1) * point.poll_interval_ms / 1000
+        def connection_failure(quality):
+            if connected:
+                return
+            for point in enabled:
+                nominal = next_read[point.point_id]
+                if nominal <= loop.time():
+                    emit(point, None, quality, nominal, initial[point.point_id])
+                    advance(point, nominal, initial[point.point_id])
         try:
             for attempt in range(connection.retry_count + 1):
                 try:
                     await asyncio.wait_for(client.connect(), connection.connect_timeout_ms / 1000)
+                    connected = True
                     last_error = None
                     break
                 except (TimeoutError, OSError, UaError, asyncio.CancelledError) as exc:
@@ -125,26 +143,13 @@ class OpcUaReader:
                     if isinstance(exc, asyncio.CancelledError) or attempt == connection.retry_count:
                         raise
                     await asyncio.sleep(min(0.1 * 2 ** attempt, 1))
-            enabled = tuple(p for p in self.points if p.enabled)
-            period = min((p.poll_interval_ms for p in enabled), default=1000)
-            mapping = {}
-            polled = []
-            handler = _Handler(mapping, emit, self._lost)
-            subscription = await client.create_subscription(period, handler)
-            for point in enabled:
-                node = client.get_node(point.opcua.node_id)
-                mapping[node.nodeid] = point
-                try:
-                    await subscription.subscribe_data_change(node, sampling_interval=point.poll_interval_ms)
-                    polled.append((point, node))
-                except (UaStatusCodeError, UaError, OSError):
-                    emit(point, None, 'BAD_PROTOCOL')
-            # DataChange subscriptions do not notify again for a constant value.
-            # A real read at the configured interval keeps freshness tied to the device.
-            loop = asyncio.get_running_loop()
-            next_read = {point.point_id: loop.time() + point.poll_interval_ms / 1000
-                         for point, _node in polled}
+            # One scheduled read is one physical result. Subscription notifications
+            # cannot create additional physical slots or refresh sample UTC.
+            polled = [(p, client.get_node(p.opcua.node_id)) for p in enabled]
             while not self._lost.is_set():
+                if refresh_plan is not None and not refresh_plan(next_read):
+                    await asyncio.sleep(0.01)
+                    continue
                 if not polled:
                     await self._lost.wait()
                     break
@@ -154,11 +159,13 @@ class OpcUaReader:
                     break
                 except TimeoutError:
                     pass
-                now = loop.time()
                 for point, node in polled:
-                    if next_read[point.point_id] > now:
+                    if refresh_plan is not None and not refresh_plan(next_read):
+                        break
+                    if next_read[point.point_id] > loop.time():
                         continue
-                    next_read[point.point_id] = now + point.poll_interval_ms / 1000
+                    nominal = next_read[point.point_id]
+                    context = before_read(point, nominal, dict(next_read)) if before_read else None
                     try:
                         data = await asyncio.wait_for(node.read_data_value(), timeout)
                         quality = quality_of(data.StatusCode)
@@ -168,18 +175,23 @@ class OpcUaReader:
                                 value = decode(point, data.Value.Value)
                             except (ValueError, TypeError, OverflowError):
                                 quality = 'BAD_DECODE'
-                        emit(point, value, quality)
+                        emit(point, value, quality, nominal, context)
                     except TimeoutError:
-                        emit(point, None, 'BAD_TIMEOUT')
+                        emit(point, None, 'BAD_TIMEOUT', nominal, context)
                     except UaStatusCodeError:
-                        emit(point, None, 'BAD_PROTOCOL')
+                        emit(point, None, 'BAD_PROTOCOL', nominal, context)
                     except (OSError, UaError) as exc:
+                        emit(point, None, 'BAD_CONNECTION', nominal, context)
                         raise ConnectionError('BAD_CONNECTION') from exc
+                    finally:
+                        advance(point, nominal, context)
         except TimeoutError as exc:
+            connection_failure('BAD_TIMEOUT')
             raise ConnectionError('BAD_TIMEOUT') from exc
         except asyncio.CancelledError:
             raise
         except (OSError, UaError, ConnectionError) as exc:
+            connection_failure('BAD_CONNECTION')
             raise ConnectionError('BAD_CONNECTION') from last_error or exc
         finally:
             await self.close()

@@ -1,0 +1,17 @@
+{
+  "markdownFiles": 11,
+  "localLinksChecked": 90,
+  "sharedContracts": [
+    {
+      "name": "protocol.schema.json",
+      "sha256": "d65c133d44a02072972361a4c601ca3b22bf0ab1125f6d63d48ca47b65a830e9",
+      "identical": true
+    },
+    {
+      "name": "topics.json",
+      "sha256": "f80f367dd34def81ba86a0a2eb370869bf99de1f25ceadfc986ca004da308d51",
+      "identical": true
+    }
+  ],
+  "frozenP02Unchanged": true
+}

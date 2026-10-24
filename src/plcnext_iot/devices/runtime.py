@@ -5,12 +5,14 @@ cooperative; stop is idempotent and a stopped old runner must be restartable.
 start schedules local work, not necessarily a successful remote connection.
 """
 import asyncio
+import time
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Callable, Protocol
 
 from plcnext_iot.config.models import ConfigSnapshot, DeviceConfig
 from plcnext_iot.devices.budget import ReadBudget
+from plcnext_iot.core.boot import ProcessBootContext
 
 
 class DeviceRunner(Protocol):
@@ -30,6 +32,8 @@ class RuntimeRecoveryError(RuntimeError):
 class SampleContext:
     config_version: int
     device: DeviceConfig
+    generation: int = 0
+    gateway_id: str = ''
 
 
 def _execution_key(device):
@@ -40,13 +44,16 @@ def _execution_key(device):
 
 
 class DeviceRuntime:
-    def __init__(self, factory: Callable[[DeviceConfig], DeviceRunner] | None = None):
+    def __init__(self, factory: Callable[[DeviceConfig], DeviceRunner] | None = None, *, boot_context=None):
         self._factory = factory
+        self.boot_context = boot_context or ProcessBootContext()
         self.read_budget = ReadBudget()
         self._runners = {}
         self._managed = {}
         self._pending = None
         self.snapshot: ConfigSnapshot | None = None
+        self.sample_generation = 0
+        self.sample_published_at = 0
 
     @property
     def runners(self):
@@ -61,7 +68,7 @@ class DeviceRuntime:
         if self.snapshot is None or self._runners.get(device_id) is not runner:
             return None
         device = next(d for d in self.snapshot.devices if d.device_id == device_id)
-        return SampleContext(self.snapshot.config_version, device)
+        return SampleContext(self.snapshot.config_version, device, self.sample_generation,self.snapshot.gateway_id)
 
     def prepare(self, snapshot: ConfigSnapshot):
         if self._pending is not None:
@@ -136,6 +143,14 @@ class RuntimeTransition:
         if not self.activated or self.runtime._pending is not self:
             raise RuntimeError("Runtime transition is not ready for publication.")
         self.runtime._runners = self.proposed
+        if self.runtime.snapshot != self.snapshot:
+            boot=self.runtime.boot_context
+            if boot.sampling_snapshot!=self.snapshot:
+                boot.sampling_generation+=1
+                boot.sampling_snapshot=self.snapshot
+                boot.sampling_published_at=time.monotonic()
+            self.runtime.sample_generation=boot.sampling_generation
+            self.runtime.sample_published_at=boot.sampling_published_at
         self.runtime.snapshot = self.snapshot
         for runner in self.stopped:
             self.runtime._managed.pop(id(runner), None)

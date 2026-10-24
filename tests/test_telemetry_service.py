@@ -22,7 +22,9 @@ class TelemetryServiceTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as directory:
             pipeline=TelemetryPipeline(runtime,samples,Path(directory),'PLC-01')
             await pipeline.start()
-            samples.put(Sample(10,'meter-A','voltage',1000,230,'GOOD'))
+            tick=asyncio.get_running_loop().time()
+            samples.put(samples.capture(10,'meter-A','voltage',230,'GOOD',completed=tick,
+                nominal=tick,origin=tick,gateway_id='PLC-01'))
             await pipeline.close()
             second=TelemetryPipeline(runtime,SampleBuffer(),Path(directory),'PLC-01')
             await second.start()
@@ -31,6 +33,6 @@ class TelemetryServiceTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(stats['pending'],1)
                 original=await second.storage.call('reserve',0,False)
                 self.assertEqual(json.loads(original)['values'][0]['value'],230)
-                self.assertEqual(json.loads(original)['values'][0]['timestamp'],1000)
+                self.assertGreater(json.loads(original)['values'][0]['timestamp'],0)
             finally:
                 await second.close()

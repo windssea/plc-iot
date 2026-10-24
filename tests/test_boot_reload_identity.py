@@ -22,6 +22,7 @@ from plcnext_iot.reporting.engine import ReportEngine
 from plcnext_iot.core.boot import MAX_SEQUENCE, ProcessBootContext
 from plcnext_iot.reporting.service import TelemetryPipeline
 from plcnext_iot.points.samples import SampleBuffer
+from plcnext_iot.core.sample_time import CaptureTime
 
 
 def configured(engine, now=0, points=2, version=10):
@@ -31,8 +32,11 @@ def configured(engine, now=0, points=2, version=10):
     config = replace(config, config_version=version, devices=(device,),
                      report=replace(config.report, max_batch_points=1))
     engine.configure(config, now)
+    samples=SampleBuffer(boot_context=engine.boot_context,gateway_id='PLC-01',
+        time_provider=SimpleNamespace(read=lambda ms:CaptureTime(1000+ms,True)))
     for point in device.points:
-        engine.accept(Sample(version, device.device_id, point.point_id, 1000, 42.5, 'GOOD', now), now)
+        engine.accept(samples.capture(version,device.device_id,point.point_id,42.5,'GOOD',
+                      completed=now,nominal=now,origin=now),now)
     return config
 
 
@@ -136,6 +140,9 @@ class BootContextTests(unittest.TestCase):
         last = engine.prepare(0, 1000, force=True)[0]
         self.assertEqual(json.loads(last.payload)['sequence'], MAX_SEQUENCE)
         self.assertEqual(validate_message('data', last.payload), [])
+        self.assertIs(engine.prepare(1,2000,force=True)[0],last)
+        engine.committed(last,1)
+        configured(engine,now=1,points=1,version=11)
         with self.assertRaisesRegex(ValueError, 'sequence exhausted'):
             engine.prepare(1, 2000, force=True)
         self.assertEqual(context.sequence, MAX_SEQUENCE)
@@ -188,7 +195,7 @@ class FakeStorage:
 
 
 class PipelineBootTests(unittest.IsolatedAsyncioTestCase):
-    async def test_failed_enqueue_burns_sequence_without_committing_or_reencoding_old_batches(self):
+    async def test_failed_enqueue_keeps_sequence_and_exact_frozen_payload(self):
         context = ProcessBootContext('durable-reload')
         storage = FakeStorage((False, True, True))
         runtime = SimpleNamespace(snapshot=None)
@@ -202,15 +209,15 @@ class PipelineBootTests(unittest.IsolatedAsyncioTestCase):
                 clock.now = 1
                 await first._flush(force=True)
             original = storage.persisted[0]
-            self.assertEqual(json.loads(original)['sequence'], 2)
+            self.assertEqual(json.loads(original)['sequence'], 1)
             self.assertEqual(len(first.engine.baselines), 1)
             second = TelemetryPipeline(runtime, SampleBuffer(), Path('unused'), 'PLC-01', boot_context=context)
             configured(second.engine, now=2, points=1, version=11)
             with patch('plcnext_iot.reporting.service.asyncio.get_running_loop', return_value=clock):
                 clock.now = 2
                 await second._flush(force=True)
-        self.assertEqual([json.loads(payload)['sequence'] for payload in storage.attempts], [1, 2, 3])
-        self.assertEqual([json.loads(payload)['sequence'] for payload in storage.persisted], [2, 3])
+        self.assertEqual([json.loads(payload)['sequence'] for payload in storage.attempts], [1, 1, 2])
+        self.assertEqual([json.loads(payload)['sequence'] for payload in storage.persisted], [1, 2])
         self.assertIs(storage.persisted[0], original)
         self.assertEqual(json.loads(original)['configVersion'], 10)
 
@@ -233,7 +240,7 @@ class PipelineBootTests(unittest.IsolatedAsyncioTestCase):
 
         class Pipeline(TelemetryPipeline):
             async def start(self):
-                self.runtime.snapshot = configured(self.engine)
+                self.runtime.snapshot = configured(self.engine,now=len(pipelines)*10)
                 pipelines.append(self)
                 await self._flush(force=True)
 

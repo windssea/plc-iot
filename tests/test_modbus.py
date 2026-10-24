@@ -12,6 +12,13 @@ sys.path.insert(0, str(ROOT / 'src'))
 from plcnext_iot.config.models import ConfigSnapshot
 
 
+async def next_physical(buffer, version=None):
+    while True:
+        sample=await buffer.get()
+        if sample.kind=='PHYSICAL_RESULT' and (version is None or sample.config_version==version):
+            return sample
+
+
 class ModbusTests(unittest.IsolatedAsyncioTestCase):
     async def test_contiguous_points_share_one_request(self):
         from plcnext_iot.points.read_plan import plan_reads
@@ -180,14 +187,15 @@ class ModbusTests(unittest.IsolatedAsyncioTestCase):
             await self.reader.read(self.device.points[0])
         self.assertEqual(len(self.requests), 2)
 
-    async def test_sample_buffer_discards_oldest_and_counts_loss(self):
+    async def test_sample_buffer_rejects_new_identity_and_counts_loss(self):
         from plcnext_iot.points.samples import Sample, SampleBuffer
         buffer = SampleBuffer(2)
         for value in (1, 2, 3):
-            buffer.put(Sample(10, 'a', 'p', 1, value, 'GOOD'))
+            buffer.put(buffer.capture(10,'a','p',value,'GOOD',completed=value,
+                nominal=value,origin=0,gateway_id='PLC-01'))
         self.assertEqual(buffer.dropped, 1)
+        self.assertEqual((await buffer.get()).value, 1)
         self.assertEqual((await buffer.get()).value, 2)
-        self.assertEqual((await buffer.get()).value, 3)
         for capacity in (0, -1, True, 10001):
             with self.assertRaises(ValueError):
                 SampleBuffer(capacity)
@@ -232,12 +240,12 @@ class ModbusTests(unittest.IsolatedAsyncioTestCase):
                 await agent.start()
                 result = await agent.submit(json.dumps(self.wire).encode())
                 self.assertEqual(result.status, 'APPLIED')
-                sample = await asyncio.wait_for(buffer.get(), 2)
+                sample = await asyncio.wait_for(next_physical(buffer), 2)
                 self.assertEqual((sample.config_version, sample.device_id, sample.point_id, sample.value, sample.quality),
                                  (10, 'meter-A', 'voltage', 230, 'GOOD'))
                 self.assertGreater(sample.timestamp, 0)
                 self.reply = bytes.fromhex('8302')
-                bad = await asyncio.wait_for(buffer.get(), 2)
+                bad = await asyncio.wait_for(next_physical(buffer), 2)
                 self.assertEqual((bad.value, bad.quality), (None, 'BAD_PROTOCOL'))
             finally:
                 await agent.close()
@@ -259,7 +267,7 @@ class ModbusTests(unittest.IsolatedAsyncioTestCase):
             try:
                 await agent.start()
                 self.assertEqual((await agent.submit(json.dumps(self.wire).encode())).status, 'APPLIED')
-                await asyncio.wait_for(buffer.get(), 2)
+                await asyncio.wait_for(next_physical(buffer), 2)
                 old = runtime.runners['meter-A']
                 self.gate = asyncio.Event()
                 previous = len(self.requests)
@@ -272,7 +280,7 @@ class ModbusTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIs(runtime.runners['meter-A'], old)
                 self.gate.set()
                 self.gate = None
-                sample = await asyncio.wait_for(buffer.get(), 2)
+                sample = await asyncio.wait_for(next_physical(buffer,11), 2)
                 self.assertEqual(sample.config_version, 11)
                 self.assertGreater(len(self.requests), previous + 1)
             finally:

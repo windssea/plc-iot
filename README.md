@@ -4,7 +4,9 @@
 
 当前交付为 **0.2.0**：独立 Agent 已形成可运行闭环。新增设备级 MQTT `config/patch` 入口，支持按设备增量操作和首次空网关引导；`config/set` 完整快照作为兼容入口保留。采集结果按报告策略写入 Outbox，经 `data` / `data/ack` 上报和补传。
 
-已完成：契约 v1、配置事务与重启恢复、Modbus TCP 批量只读采集、OPC UA 只读订阅、MQTT 配置 ACK、遥测补传、去重接收端、设备状态/心跳、浏览器初始化、多架构镜像和未签名 WBM 开发包。已与 PLCnext-mock-device、独立 Mosquitto 联调。
+当前工作区已完成 [三方阶段 1 I01/I02](doc/verification/2026-10-24-i01-i02.md)：不可变采样事件、按事件入口选择、名义周期与一次状态转换、已接纳基准和原字节冻结；88 项受约束隔离测试通过。OPC UA 改为计划读取，入口满拒绝新事件；尚未更新运行 Agent/镜像。I03～I06 和真实交付验收待完成。无数据库/设备连接的复现入口为 `.venv/Scripts/python.exe tools/verify_phase1_events.py`。
+
+已完成：契约 v1、配置事务与重启恢复、Modbus TCP 批量只读采集、OPC UA 只读采集、MQTT 配置 ACK、遥测补传、去重接收端、设备状态/心跳、浏览器初始化、多架构镜像和未签名 WBM 开发包。既有版本已与 PLCnext-mock-device、独立 Mosquitto 联调，本轮源码变化只完成所列隔离测试。
 
 尚未完成：Hub 对接、PLC / WBM 真机安装、OPC UA `Sign`/`SignAndEncrypt` 证书、南向 MQTT、写设备命令、OTA、契约中的 `event` Topic 发布。心跳里的 `agentVersion` 现为 `0.2.0`。
 
@@ -18,7 +20,7 @@
 - [设备增量配置说明](doc/设备增量配置说明.md)：单设备新增、替换、删除，基础版本保护、持久重放和独立应用确认。
 - [协调器与生命周期说明](doc/协调器与生命周期说明.md)：运行状态、任务切换、启动入口与驱动接口要求。
 - [Modbus 模拟采集说明](doc/Modbus模拟采集说明.md)：驱动、采样语义和跨项目联调命令。
-- [OPC UA 采集说明](doc/OPC UA采集说明.md)：NodeId、订阅采集、安全边界和混合快照。
+- [OPC UA 采集说明](doc/OPC UA采集说明.md)：NodeId、计划读取、安全边界和混合快照。
 - [MQTT 配置闭环说明](doc/MQTT配置闭环说明.md)：Broker 设置、下发工具、ACK 和重连验收。
 - [遥测报告与补传说明](doc/遥测报告与补传说明.md)：报告策略、Outbox、STORED 确认和独立接收端。
 - [批量采集与运行诊断说明](doc/批量采集与运行诊断说明.md)：读取计划、并发上限、设备状态和心跳。

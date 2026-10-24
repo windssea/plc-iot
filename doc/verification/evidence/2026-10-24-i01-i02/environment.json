@@ -1,0 +1,11 @@
+{
+  "checkedAt": "2026-10-24T10:42:50.1276261+08:00",
+  "backendInstances": 1,
+  "backendPid": 34208,
+  "backendHttpWithoutAuth": 401,
+  "resourceRecorders": 0,
+  "backendRestarted": false,
+  "deviceOperations": 0,
+  "databaseCreated": false,
+  "databaseAccessRequired": false
+}

@@ -12,7 +12,9 @@ sys.path.insert(0, str(ROOT / 'src'))
 from plcnext_iot.config.models import ConfigSnapshot
 from plcnext_iot.contracts import validate_message
 from plcnext_iot.messaging.messages import encode
-from plcnext_iot.points.samples import Sample
+from plcnext_iot.points.samples import SampleBuffer
+from plcnext_iot.core.sample_time import CaptureTime
+from types import SimpleNamespace
 from plcnext_iot.reporting.engine import ReportEngine
 from plcnext_iot.reporting.service import TelemetryPipeline
 
@@ -25,14 +27,17 @@ def configured(points=1, max_batch_points=500):
     snapshot = replace(snapshot, devices=(device,), report=replace(snapshot.report,
                         batch_interval_ms=1000, max_batch_points=max_batch_points))
     engine = ReportEngine('PLC-01', 'pure-regression')
+    engine.test_samples = SampleBuffer(boot_context=engine.boot_context,gateway_id='PLC-01',
+        time_provider=SimpleNamespace(read=lambda ms:CaptureTime(ms,True)))
     engine.configure(snapshot, 0)
     return engine, snapshot
 
 
 def accept(engine, snapshot, tick):
     for point in snapshot.devices[0].points:
-        engine.accept(Sample(snapshot.config_version, snapshot.devices[0].device_id, point.point_id,
-                             int(tick*1000), 42.5, 'GOOD', float(tick)), float(tick))
+        sample=engine.test_samples.capture(snapshot.config_version,snapshot.devices[0].device_id,
+            point.point_id,42.5,'GOOD',completed=float(tick),nominal=float(tick),origin=0)
+        engine.accept(sample,float(tick))
 
 
 class ReportPolicyClockTests(unittest.TestCase):
@@ -66,8 +71,8 @@ class ReportPolicyClockTests(unittest.TestCase):
         self.assertEqual(engine.baselines, {})
         accept(engine, snapshot, 2)
         batches = engine.prepare(2, 2000)
-        self.assertEqual(len(batches), 1)
-        self.assertEqual(batches[0].samples[0].timestamp, 2000)
+        self.assertEqual(len(batches), 2)
+        self.assertEqual([b.samples[0].timestamp for b in batches], [1000,2000])
 
     def test_old_version_commit_does_not_advance_new_baseline(self):
         engine, snapshot = configured()
@@ -99,7 +104,9 @@ class ReportPolicyClockTests(unittest.TestCase):
         batch = engine.prepare(1, 1000)[0]
         engine.committed(batch, 3.5)
         accept(engine, snapshot, 3.5)
-        self.assertEqual(len(engine.prepare(3.5, 3500)), 1)
+        batch=engine.prepare(3.5,3500)[0]
+        self.assertEqual(engine.prepare(3.5,3500),[])
+        engine.committed(batch,3.5)
         self.assertEqual(engine.prepare(3.5, 3500), [])
         self.assertEqual(engine.prepare(3.6, 3600), [])
 

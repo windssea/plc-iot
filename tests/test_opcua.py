@@ -162,7 +162,7 @@ class OpcUaRuntimeTests(unittest.IsolatedAsyncioTestCase):
         payload = self.payload(('level', 'Level', 'float32', 'tank.level', {}))
         runtime, samples = await self.start_agent(payload)
         old_runner = runtime.runners['tank-A']
-        report = ReportEngine('PLC-01', 'boot-test')
+        report = ReportEngine('PLC-01', samples.boot_context.boot_id,boot_context=samples.boot_context)
         report.configure(runtime.snapshot, asyncio.get_running_loop().time())
         await self.collect(samples, lambda sample: sample.quality == 'GOOD')
 
