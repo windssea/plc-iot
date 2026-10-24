@@ -18,6 +18,9 @@ class ProcessBootContext:
         self.point_sources = {}
         self.point_sources_owner = None
         self.report_checkpoint = None
+        self.outbox_session = None
+        self.telemetry_closing = None
+        self.telemetry_owner = None
 
     @property
     def sequence(self):

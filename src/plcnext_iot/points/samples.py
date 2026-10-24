@@ -4,9 +4,10 @@ import math
 
 from plcnext_iot.core.boot import MAX_SEQUENCE, ProcessBootContext
 from plcnext_iot.core.sample_time import SystemRtcCompatibility
+from plcnext_iot.core.bounds import event_charge
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Sample:
     config_version: int
     device_id: str
@@ -57,10 +58,13 @@ class Sample:
 
 class SampleBuffer:
     """Bounded diagnostic stream, not a durable telemetry outbox."""
-    def __init__(self, capacity=4096, *, boot_context=None, time_provider=None, gateway_id=None):
+    def __init__(self, capacity=4096, *, boot_context=None, time_provider=None, gateway_id=None, max_bytes=4*1024*1024):
         if type(capacity) is not int or not 1 <= capacity <= 10000:
             raise ValueError('Sample capacity must be in 1..10000')
         self._queue = asyncio.Queue(capacity)
+        if type(max_bytes) is not int or max_bytes < 1:
+            raise ValueError('Ingress byte limit must be positive')
+        self.max_bytes, self.used_bytes = max_bytes, 0
         self.dropped = 0
         self.boot_context = boot_context or ProcessBootContext()
         self.time_provider = time_provider or SystemRtcCompatibility()
@@ -104,7 +108,8 @@ class SampleBuffer:
         if sample.sample_seq <= self._last_put_sequence:
             raise ValueError('Ingress identity must be submitted once in capture order')
         self._last_put_sequence = sample.sample_seq
-        if self._queue.full():
+        charge = event_charge(sample)
+        if self._queue.full() or self.used_bytes+charge > self.max_bytes:
             self.dropped += 1
             self.capture_overflow_events += 1
             self.undecided_lost_events += 1
@@ -112,10 +117,15 @@ class SampleBuffer:
             self.last_overflow_identity = (sample.capture_boot_id, sample.sample_seq)
             return False
         self._queue.put_nowait(sample)
+        self.used_bytes += charge
         return True
 
     async def get(self):
-        return await self._queue.get()
+        sample = await self._queue.get()
+        self.used_bytes -= event_charge(sample)
+        return sample
 
     def get_nowait(self):
-        return self._queue.get_nowait()
+        sample = self._queue.get_nowait()
+        self.used_bytes -= event_charge(sample)
+        return sample

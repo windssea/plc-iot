@@ -178,6 +178,7 @@ class FakeStorage:
     def __init__(self, outcomes=(True,)):
         self.outcomes = iter(outcomes)
         self.attempts, self.persisted = [], []
+        self.jobs=self.used_bytes=0
 
     async def call(self, method, *args):
         if method == 'enqueue':
@@ -260,7 +261,7 @@ class PipelineBootTests(unittest.IsolatedAsyncioTestCase):
         settings = SimpleNamespace(gateway_id='PLC-01', data_directory=Path('unused'))
         with patch.object(agent_tool, 'AgentLifecycle', FakeAgent), \
                 patch('plcnext_iot.reporting.service.TelemetryPipeline', Pipeline), \
-                patch('plcnext_iot.reporting.service.StoreWorker', side_effect=lambda *args: FakeStorage()), \
+                patch('plcnext_iot.reporting.service.StoreWorker', side_effect=lambda *args,**kwargs: FakeStorage()), \
                 patch('plcnext_iot.messaging.config_service.MqttConfigService', FakeMqtt), redirect_stdout(io.StringIO()):
             for _ in range(2):
                 self.assertEqual(await agent_tool.run(settings, [], 0, mqtt_settings=object(),

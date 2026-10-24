@@ -15,6 +15,10 @@ class Incoming:
     retained: bool
 
 
+class PublishRejected(ConnectionError):
+    """The SDK did not accept these bytes (distinct from a lost PUBACK)."""
+
+
 async def _thread(function, *args):
     task = asyncio.create_task(asyncio.to_thread(function, *args))
     try:
@@ -118,11 +122,18 @@ class PahoConnection:
                 await asyncio.sleep(0.02)
 
     async def publish(self, topic, payload, *, retain=False):
+        info=self.submit_publish(topic,payload,retain=retain)
+        await self.wait_puback(info)
+
+    def submit_publish(self, topic, payload, *, retain=False):
         if not self.connected:
-            raise ConnectionError('MQTT disconnected')
+            raise PublishRejected('MQTT disconnected')
         info = self._client.publish(topic,payload,qos=1,retain=retain)
         if info.rc != mqtt.MQTT_ERR_SUCCESS:
-            raise ConnectionError('MQTT publish queue unavailable')
+            raise PublishRejected('MQTT publish queue unavailable')
+        return info
+
+    async def wait_puback(self, info):
         async with asyncio.timeout(5):
             while not info.is_published():
                 if not self.connected:

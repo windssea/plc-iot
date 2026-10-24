@@ -1,0 +1,10 @@
+{"kind":"committed","message_id":"s","hash":"ef84367fe97490990a002a671d336cba55ff96aec1fc679003028bf40cac5c5e","capture_boot":"capture","sample_seq":1}
+{"kind":"reserved","message_id":"s","hash":"ef84367fe97490990a002a671d336cba55ff96aec1fc679003028bf40cac5c5e","capture_boot":"capture","attempt":1,"category":"new","sample_seq":1}
+{"kind":"stored","message_id":"s","hash":"ef84367fe97490990a002a671d336cba55ff96aec1fc679003028bf40cac5c5e","capture_boot":"capture","late":false,"sample_seq":1}
+{"kind":"committed","message_id":"p","hash":"ebc6ae9038245b8e87293ba90643fcb0bab903d39397a657c9d9d7dc7504b5f5","capture_boot":"capture","sample_seq":2}
+{"kind":"committed","message_id":"l","hash":"9e706288f1f03c4174c6f01f7b78ee02e10af4c9b3fbe41729f43a794c89fe9f","capture_boot":"capture","sample_seq":3}
+{"kind":"committed","message_id":"u","hash":"7e85805e60671270af665fa4f248804716e5bb3431534c436787fcd9d7ebc623","capture_boot":"capture","sample_seq":4}
+{"kind":"reserved","message_id":"u","hash":"7e85805e60671270af665fa4f248804716e5bb3431534c436787fcd9d7ebc623","capture_boot":"capture","attempt":1,"category":"new","sample_seq":4}
+{"kind":"terminal","message_id":"l","hash":"9e706288f1f03c4174c6f01f7b78ee02e10af4c9b3fbe41729f43a794c89fe9f","capture_boot":"capture","source":"AGE_EXPIRED","outcome":"known_unsent","sample_seq":3}
+{"kind":"terminal","message_id":"u","hash":"7e85805e60671270af665fa4f248804716e5bb3431534c436787fcd9d7ebc623","capture_boot":"capture","source":"AGE_EXPIRED","outcome":"uncertain","sample_seq":4}
+{"kind":"stored","message_id":"u","hash":"7e85805e60671270af665fa4f248804716e5bb3431534c436787fcd9d7ebc623","capture_boot":"capture","late":true,"sample_seq":4}

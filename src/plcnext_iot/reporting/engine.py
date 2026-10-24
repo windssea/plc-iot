@@ -7,6 +7,7 @@ import uuid
 from plcnext_iot.messaging.messages import encode
 from plcnext_iot.core.boot import ProcessBootContext
 from plcnext_iot.points.samples import Sample
+from plcnext_iot.core.bounds import event_charge
 
 
 @dataclass(frozen=True)
@@ -19,7 +20,7 @@ class ReportBatch:
 
 
 class ReportEngine:
-    def __init__(self, gateway, boot_id, *, boot_context=None, capacity=32768):
+    def __init__(self, gateway, boot_id, *, boot_context=None, capacity=32768, max_bytes=32*1024*1024):
         if type(capacity) is not int or not 1 <= capacity <= 32768:
             raise ValueError('Selected-event capacity must be 1..32768')
         self.gateway, self.boot_id = gateway, boot_id
@@ -27,11 +28,19 @@ class ReportEngine:
         if self.boot_context.boot_id != boot_id:
             raise ValueError('Report engine boot identity does not match its process context')
         self.capacity = capacity
+        if type(max_bytes) is not int or max_bytes < 1:
+            raise ValueError('Selected-event byte limit must be positive')
+        self.max_bytes, self.used_bytes = max_bytes, 0
+        self._refs = {}
         self.snapshot = None
         self.generation = None
         self.points, self.latest, self.baselines, self.shadows = {}, {}, {}, {}
         self._epochs, self._seen, self.next_report_due = {}, {}, {}
         self._owned, self._queue, self._frozen, self._owners = {}, deque(), {}, {}
+        self._history = deque()
+        self._classes = {}
+        self._prefer_new = True
+        self.watermark = 0
         self.next_batch = 0
         self.discarded = self.cache_reset_points = 0
         self.eligible_events = self.policy_filtered_events = 0
@@ -54,6 +63,20 @@ class ReportEngine:
     def _key(sample):
         return sample.device_id, sample.point_id
 
+    def _retain(self,sample):
+        key=self._identity(sample)
+        if key not in self._refs:
+            self._refs[key]=[sample,0]
+            self.used_bytes+=event_charge(sample)
+        self._refs[key][1]+=1
+
+    def _forget(self,sample):
+        key=self._identity(sample)
+        self._refs[key][1]-=1
+        if not self._refs[key][1]:
+            self.used_bytes-=event_charge(sample)
+            del self._refs[key]
+
     def configure(self, snapshot, now, *, generation=None):
         if snapshot == self.snapshot and generation == self.generation:
             return
@@ -61,12 +84,18 @@ class ReportEngine:
         self.snapshot, self.generation = snapshot, generation
         self.points = {(d.device_id, p.point_id): p for d in snapshot.devices for p in d.points
                        if snapshot.enabled and d.enabled and p.enabled} if snapshot else {}
-        self.latest.clear(); self.baselines.clear(); self.shadows.clear()
+        for sample in self.latest.values():
+            self._forget(sample)
+        for sample,_ in self.baselines.values():
+            self._forget(sample)
+        self.latest.clear(); self.shadows.clear()
         checkpoint=self.boot_context.report_checkpoint
         if checkpoint is None or checkpoint['identity']!=(snapshot,generation):
             checkpoint=dict(identity=(snapshot,generation),baselines={},epochs={},seen={},next_due={})
             self.boot_context.report_checkpoint=checkpoint
         self.baselines=checkpoint['baselines']
+        for sample,_ in self.baselines.values():
+            self._retain(sample)
         self._epochs=checkpoint['epochs'];self._seen=checkpoint['seen']
         self.next_report_due=checkpoint['next_due']
         self.next_batch = now + (snapshot.report.batch_interval_ms / 1000 if snapshot else 1)
@@ -77,7 +106,15 @@ class ReportEngine:
         return max(candidates, key=lambda s: s.sample_seq) if candidates else None
 
     def _can_admit(self, sample):
-        return len(self._owned) < self.capacity
+        reserve = min(2*1024*1024,self.max_bytes//8)
+        charge=0 if self._identity(sample) in self._refs else event_charge(sample)
+        return len(self._owned) < self.capacity and self.used_bytes+charge <= self.max_bytes-reserve
+
+    def open_gate(self, watermark):
+        self.watermark = watermark
+        self._history.extend(self._queue)
+        self._queue.clear()
+        self._classes = {seq: 'history' for seq in self._frozen}
 
     def accept(self, sample, now):
         key = self._key(sample)
@@ -96,9 +133,18 @@ class ReportEngine:
         epoch = self._epoch(sample)
         if self._epochs.get(key) != epoch:
             self._epochs[key] = epoch
-            self.baselines.pop(key, None); self.shadows.pop(key, None)
+            old=self.baselines.pop(key, None)
+            if old is not None:
+                self._forget(old[0])
+            self.shadows.pop(key, None)
             self.next_report_due[key] = sample.nominal_origin_mono_ms
-        self.latest[key] = sample  # View only; never a source for prepare().
+        old=self.latest.pop(key,None)
+        if old is not None:
+            self._forget(old)
+        # This optional view never consumes reserved materialization headroom.
+        if self.used_bytes+event_charge(sample)<=self.max_bytes-min(2*1024*1024,self.max_bytes//8):
+            self.latest[key] = sample
+            self._retain(sample)
         point = self.points[key]
         baseline = self._baseline(key)
         selected = baseline is None or baseline.quality != sample.quality
@@ -129,8 +175,10 @@ class ReportEngine:
             self.admission_rejected_events += 1; self.known_unsent_events += 1
             return False
         self._owned[self._identity(sample)] = sample
+        self._retain(sample)
         self._owners.setdefault((epoch, key), {})[sample.sample_seq] = sample
-        self._queue.append((sample, min(500, self.snapshot.report.max_batch_points)))
+        queue = self._history if sample.sample_seq <= self.watermark else self._queue
+        queue.append((sample, min(500, self.snapshot.report.max_batch_points)))
         self.shadows[key] = sample
         return True
 
@@ -139,9 +187,19 @@ class ReportEngine:
             return []
         self.next_batch = now + (self.snapshot.report.batch_interval_ms / 1000 if self.snapshot else 1)
         batches = list(self._frozen.values())
-        while self._queue:
+        # Bound work and encoded copies even when SQLite is unavailable. Each
+        # class can use seven slots, reserving one for the other class.
+        while len(self._frozen) < 8 and (self._queue or self._history):
+            available = {c:q for c,q in (('new',self._queue),('history',self._history))
+                         if q and sum(v==c for v in self._classes.values()) < 7}
+            if not available:
+                break
+            category = ('new' if self._prefer_new else 'history')
+            if category not in available:
+                category = next(iter(available))
+            queue = available[category]
             pending = []; seen = set(); size = 512; limit = 500
-            for sample, sample_limit in islice(self._queue, 500):
+            for sample, sample_limit in islice(queue, 500):
                 key = self._key(sample)
                 value = dict(deviceId=sample.device_id, pointId=sample.point_id,
                              timestamp=sample.timestamp, value=sample.value, quality=sample.quality)
@@ -158,15 +216,22 @@ class ReportEngine:
                 configVersion=pending[0].config_version, values=values))
             if len(payload) > 131072:
                 raise ValueError('Telemetry batch exceeds byte limit')
+            charge = len(payload)+256+8*len(pending)
+            if self.used_bytes+charge > self.max_bytes:
+                break
             batch = ReportBatch(payload, pending[0].config_version, tuple(pending), now, sequence)
             self._frozen[sequence] = batch
+            self._classes[sequence] = category
+            self.used_bytes += charge
+            self._prefer_new = category != 'new'
             batches.append(batch)
             for _ in pending:
-                self._queue.popleft()
+                queue.popleft()
         return batches
 
     def _release(self, sample):
         self._owned.pop(self._identity(sample), None)
+        self._forget(sample)
         epoch, key = self._epoch(sample), self._key(sample)
         owners = self._owners[(epoch, key)]
         owners.pop(sample.sample_seq, None)
@@ -183,10 +248,27 @@ class ReportEngine:
         if self._frozen.get(sequence) is not batch:
             return
         del self._frozen[sequence]
+        self._classes.pop(sequence, None)
+        self.used_bytes -= len(batch.payload)+256+8*len(batch.samples)
         for sample in batch.samples:
             key = self._key(sample)
             if self._epochs.get(key) == self._epoch(sample):
                 old = self.baselines.get(key)
                 if old is None or sample.sample_seq > old[0].sample_seq:
+                    if old is not None:
+                        self._forget(old[0])
                     self.baselines[key] = (sample, sample.completed_mono_ms / 1000)
+                    self._retain(sample)
             self._release(sample)
+
+    def abandon(self):
+        """Producer stopped, no enqueue in progress: remaining RAM is known unsent."""
+        count = len(self._owned)
+        self.known_unsent_events += count
+        for sample in self._owned.values():
+            self._forget(sample)
+        for batch in self._frozen.values():
+            self.used_bytes-=len(batch.payload)+256+8*len(batch.samples)
+        self._queue.clear(); self._history.clear(); self._frozen.clear(); self._classes.clear()
+        self._owned.clear(); self._owners.clear(); self.shadows.clear()
+        return count

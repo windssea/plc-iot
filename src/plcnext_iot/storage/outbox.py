@@ -1,94 +1,198 @@
-"""Immutable batches: reserve is not delete; only STORED acknowledges delivery."""
+"""Immutable v1 payload storage, monotonic retry, bounded same-run correlation."""
 import hashlib
 import json
 
 from plcnext_iot.contracts import validate_message
 from plcnext_iot.config.store import StoreFormatError
 from plcnext_iot.storage.database import Database
+from plcnext_iot.storage.batch_repository import SqlBatches
+from plcnext_iot.storage.outbox_session import OutboxSession
 
 
 class OutboxStore(Database):
-    def __init__(self,path,gateway,*,max_batches=10000,max_bytes=64*1024*1024,max_dead=128):
+    def __init__(self,path,gateway,*,max_batches=10000,max_bytes=64*1024*1024,max_dead=128,
+                 session=None,repository=None):
         if any(type(v) is not int or v<1 for v in (max_batches,max_bytes,max_dead)):
             raise ValueError('Outbox limits must be positive integers')
         self.max_batches,self.max_bytes,self.max_dead=max_batches,max_bytes,max_dead
-        super().__init__(path,gateway,0x504F5554,{'batches':'''CREATE TABLE batches(
-            message_id TEXT PRIMARY KEY,payload BLOB NOT NULL,hash TEXT NOT NULL,
-            created REAL NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,next_due REAL NOT NULL DEFAULT 0,
-            state TEXT NOT NULL CHECK(state IN ('PENDING','DEAD')),reason TEXT)'''})
+        self.session = session or OutboxSession()
+        self.gateway = gateway
+        self._injected = repository is not None
+        if repository is None:
+            SqlBatches.preflight(path)
+            super().__init__(path,gateway,0x504F5554,{'batches':'''CREATE TABLE batches(
+                message_id TEXT PRIMARY KEY,payload BLOB NOT NULL,hash TEXT NOT NULL,
+                created REAL NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,next_due REAL NOT NULL DEFAULT 0,
+                state TEXT NOT NULL CHECK(state IN ('PENDING','DEAD')),reason TEXT)'''})
         try:
-            self.reset_inflight()
+            self.repo = repository or SqlBatches(self)
+            def bounded_rows():
+                count=size=0
+                for row in self.repo.rows():
+                    count+=1;size+=row['size']
+                    if count>max_batches or size>max_bytes:
+                        raise StoreFormatError('Existing Outbox exceeds configured quota')
+                    yield row
+            self.session.attach(bounded_rows())
+            if sum(e.row['state']=='DEAD' for e in self.session.entries.values())>self.max_dead:
+                raise StoreFormatError('Existing Outbox exceeds DEAD quota')
         except BaseException:
             self.close()
             raise
 
+    def close(self):
+        if not getattr(self,'_injected',False):
+            super().close()
+
     def reset_inflight(self):
-        with self.transaction():
-            self.c.execute("UPDATE batches SET next_due=0 WHERE state='PENDING'")
+        """Compatibility no-op: reconnect never resets monotonic deadlines."""
 
-    def _expire(self,now):
-        self.c.execute("UPDATE batches SET state='DEAD',reason='EXPIRED_DATA' WHERE state='PENDING' AND created<=?",(now-7*86400,))
-        count=self.c.execute("SELECT count(*) FROM batches WHERE state='DEAD'").fetchone()[0]
-        remove=max(0,count-self.max_dead)
-        if remove:
-            self.c.execute("DELETE FROM batches WHERE message_id IN (SELECT message_id FROM batches WHERE state='DEAD' ORDER BY created,message_id LIMIT ?)",(remove,))
-            self.c.execute('UPDATE meta SET dead_pruned=dead_pruned+? WHERE id=1',(remove,))
+    def open_gate(self, watermark):
+        self.session.open_gate(watermark)
 
-    def enqueue(self,payload,now):
+    def _prune(self):
+        dead = [(e.row['local_order'],key) for key,e in self.session.entries.items() if e.row['state']=='DEAD']
+        for _,key in sorted(dead)[:max(0,len(dead)-self.max_dead)]:
+            entry = self.session.entries[key]
+            self.repo.prune(key)
+            del self.session.entries[key]
+            self.session.emit('pruned',key,entry)
+            self.session.detail_truncated = True
+
+    def _expire(self, now):
+        # SYSTEM_RTC_COMPAT only; trusted UTC age recovery remains a later task.
+        mono = self.session.clock()
+        for key,entry in list(self.session.entries.items()):
+            if key not in self.session.entries:
+                continue
+            row = entry.row
+            if row['state']=='PENDING' and row['created']<=now-7*86400 and not (entry.active and mono<entry.due):
+                self._terminal(key,'EXPIRED_DATA','AGE_EXPIRED')
+        self._prune()
+
+    def _terminal(self,key,reason,source):
+        dead=[(e.row['local_order'],k) for k,e in self.session.entries.items() if k==key or e.row['state']=='DEAD']
+        pruned=[k for _,k in sorted(dead)[:max(0,len(dead)-self.max_dead)]]
+        self.repo.terminal(key,reason,pruned)
+        self.session.entries[key].row.update(state='DEAD',reason=reason)
+        self.session.terminal(key,source)
+        for old in pruned:
+            entry=self.session.entries.pop(old)
+            self.session.emit('pruned',old,entry)
+            self.session.detail_truncated=True
+
+    def enqueue(self,payload,now,association=None):
         if validate_message('data',payload,expected_gateway_id=self.gateway):
             raise ValueError('Invalid telemetry batch')
-        message_id=json.loads(payload)['messageId']
-        with self.transaction():
-            existing=self.c.execute('SELECT payload FROM batches WHERE message_id=?',(message_id,)).fetchone()
-            if existing:
-                if existing['payload']!=payload:
-                    raise ValueError('Batch identity conflict')
-                return True
-            self._expire(now)
-            count,size=self.c.execute('SELECT count(*),coalesce(sum(length(payload)),0) FROM batches').fetchone()
-            if count>=self.max_batches or size+len(payload)>self.max_bytes:
-                self.c.execute('UPDATE meta SET dropped=dropped+1 WHERE id=1')
-                return False
-            self.c.execute("INSERT INTO batches(message_id,payload,hash,created,state) VALUES(?,?,?,?,'PENDING')",
-                           (message_id,payload,hashlib.sha256(payload).hexdigest(),now))
+        wire = json.loads(payload); key=wire['messageId']
+        if key in self.session.entries:
+            if self.repo.payload(key)!=payload:
+                raise ValueError('Batch identity conflict')
             return True
+        self._expire(now)
+        entries = self.session.entries
+        if len(entries)>=self.max_batches or sum(e.row['size'] for e in entries.values())+len(payload)>self.max_bytes:
+            self.repo.count_attempt('dropped')
+            self.session.add_fact('enqueue_rejected_attempts')
+            return False
+        row = dict(message_id=key,hash=hashlib.sha256(payload).hexdigest(),created=now,size=len(payload),
+                   attempts=0,next_due=0,state='PENDING',reason=None,
+                   local_order=max((e.row['local_order'] for e in entries.values()),default=0)+1)
+        association = association or {}
+        events = association.get('events',())
+        category = 'history' if events and max(events)<=self.session.watermark else 'new'
+        entry = self.session.stage(key,row,events,association.get('capture_boot'),category)
+        if entry is None:
+            return False
+        self.repo.insert(row,payload)
+        entry.row = row
+        self.session.staged.pop(key)
+        entries[key] = entry
+        self.session.emit('committed',key,entry)
+        return True
 
-    def reserve(self,now,prefer_new):
-        with self.transaction():
+    def reserve(self, now=None, prefer_new=None):
+        session=self.session; mono=session.clock()
+        if now is not None:
             self._expire(now)
-            if self.c.execute("SELECT count(*) FROM batches WHERE state='PENDING' AND attempts>0 AND next_due>?",(now,)).fetchone()[0]>=8:
-                return None
-            order='attempts=0 DESC' if prefer_new else 'attempts>0 DESC'
-            row=self.c.execute(f"SELECT * FROM batches WHERE state='PENDING' AND next_due<=? ORDER BY {order},created,message_id LIMIT 1",(now,)).fetchone()
-            if row is None:
-                return None
-            payload=row['payload']
-            if hashlib.sha256(payload).hexdigest()!=row['hash'] or validate_message('data',payload,expected_gateway_id=self.gateway):
-                raise StoreFormatError('Stored telemetry batch is corrupt')
-            self.c.execute('UPDATE batches SET attempts=attempts+1,next_due=? WHERE message_id=?',
-                           (now+(30 if row['attempts']==0 else 60),row['message_id']))
-            return payload
+        while session.rate and mono-session.rate[0][0]>=1:
+            session.rate.popleft()
+        if mono<session.next_send or len(session.rate)>=4:
+            return None
+        entries=list(session.entries.values())
+        for e in entries:
+            if e.active and mono>=e.due:
+                e.active=False
+        active=[e for e in entries if e.active]
+        if len(active)>=8:
+            return None
+        eligible={c:[] for c in ('new','history')}
+        for e in entries:
+            if e.row['state']=='PENDING' and not e.active and e.due<=mono:
+                eligible[e.category].append(e)
+        for c in eligible:
+            if sum(e.category==c for e in active)>=7:
+                eligible[c]=[]
+        category='new' if session.prefer_new else 'history'
+        if not eligible[category]:
+            category='history' if category=='new' else 'new'
+        if not eligible[category]:
+            return None
+        e=min(eligible[category],key=lambda e:e.row['local_order']); key=e.row['message_id']
+        payload=self.repo.payload(key)
+        if payload is None or hashlib.sha256(payload).hexdigest()!=e.row['hash'] or validate_message('data',payload,expected_gateway_id=self.gateway):
+            raise StoreFormatError('Stored telemetry batch is corrupt')
+        if sum(size for _,size in session.rate)+len(payload)>512*1024:
+            return None
+        attempts=min(e.row['attempts']+1,9007199254740991)
+        self.repo.update(key,attempts=attempts,next_due=0)
+        mono=session.clock()
+        e.row['attempts']=attempts
+        e.previous_sent=e.ever_sent
+        e.due=mono+(30 if attempts==1 else 60);e.active=True;e.ever_sent=True
+        session.next_send=mono+0.25;session.rate.append((mono,len(payload)))
+        session.prefer_new=category!='new'
+        session.emit('reserved',key,e,attempt=attempts,category=category)
+        return payload
 
-    def acknowledge(self,payload,now):
+    def submission_failed(self, message_id):
+        """SDK definitively rejected this attempt; retain its retry deadline."""
+        e=self.session.entries.get(message_id)
+        if e is not None and e.row['state']=='PENDING':
+            e.ever_sent=e.previous_sent;e.active=False
+            self.session.emit('sdk_rejected',message_id,e)
+
+    def acknowledge(self,payload,now=None):
         if validate_message('dataAck',payload,expected_gateway_id=self.gateway):
             return False
-        ack=json.loads(payload)
-        with self.transaction():
-            row=self.c.execute("SELECT * FROM batches WHERE message_id=? AND state='PENDING' AND attempts>0",(ack['messageId'],)).fetchone()
-            if row is None:
+        ack=json.loads(payload);key=ack['messageId'];session=self.session
+        e=session.entries.get(key)
+        if e is None or not e.row['attempts']:
+            session.unknown_ack();return False
+        if ack['status']=='STORED':
+            if e.row['state']=='DEAD' and (e.source!='AGE_EXPIRED' or not e.ever_sent):
+                session.add_fact('conflicting_acks')
+                session.emit('conflict',key,e)
                 return False
-            if ack['status']=='STORED':
-                self.c.execute('DELETE FROM batches WHERE message_id=?',(ack['messageId'],))
-            else:
-                codes=[e['code'] for e in ack['errors']]
-                if all(c in {'UNKNOWN_CONFIG_VERSION','RESOURCE_LIMIT','STORAGE_ERROR'} for c in codes):
-                    self.c.execute('UPDATE batches SET next_due=? WHERE message_id=?',(now+60,ack['messageId']))
-                else:
-                    self.c.execute("UPDATE batches SET state='DEAD',reason=? WHERE message_id=?",(','.join(codes),ack['messageId']))
-                    self._expire(now)
+            self.repo.delete(key)
+            session.add_fact('stored',len(e.events))
+            if e.source=='AGE_EXPIRED':
+                session.add_fact('late_stored',len(e.events))
+            session.emit('stored',key,e,late=e.source=='AGE_EXPIRED')
+            del session.entries[key]
             return True
+        if e.row['state']=='DEAD':
+            return False
+        codes=list(dict.fromkeys(err['code'] for err in ack['errors']))
+        if codes and all(c in {'UNKNOWN_CONFIG_VERSION','RESOURCE_LIMIT','STORAGE_ERROR'} for c in codes):
+            e.due=session.clock()+60;e.active=False
+            session.emit('retryable_reject',key,e)
+        else:
+            self._terminal(key,','.join(codes),'PERMANENT_REJECT')
+        return True
 
     def stats(self):
-        row=self.c.execute("SELECT coalesce(sum(state='PENDING'),0),coalesce(sum(state='DEAD'),0),coalesce(sum(length(payload)),0) FROM batches").fetchone()
-        meta=self.c.execute('SELECT dropped,dead_pruned FROM meta WHERE id=1').fetchone()
-        return dict(pending=row[0],dead=row[1],payload_bytes=row[2],dropped=meta[0],dead_pruned=meta[1])
+        entries=self.session.entries.values()
+        return dict(pending=sum(e.row['state']=='PENDING' for e in entries),
+                    dead=sum(e.row['state']=='DEAD' for e in entries),
+                    payload_bytes=sum(e.row['size'] for e in entries),**self.repo.counters())
