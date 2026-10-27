@@ -61,7 +61,7 @@ class BudgetTests(unittest.IsolatedAsyncioTestCase):
         runtime._runners[device.device_id] = runner
         class Reader:
             calls = 0
-            def __init__(self, connection): pass
+            def __init__(self, connection, pool=None): pass
             def close(self): pass
             async def read_block(self, block, budget):
                 self.calls += 1

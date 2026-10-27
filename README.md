@@ -1,6 +1,12 @@
 # PLCnext IoT 子设备采集
 
+> 最新联调（2026-10-27）：Python端点连接复用修复通过376项隔离回归，真实启动/同进程重连2250事件完整入库释放、42收据/2250行一致，漏轮询/报告均0；与既有PLC证据的1532共同物理槽一致。历史314缺口保留，整体验收及P06仍未放行。既有SQLite已恢复，唯一后端和mock保持，本轮未操作PLC。见[修复报告](doc/verification/2026-10-27-project-entry-python-startup.md)与[工程下载入口](../PLCnext-Engineer/projects/README.md)。
+
+本轮禁止新建数据库的回归入口：`python tools/run_startup_regression.py`（55项，SQLite连接守卫）。全量`unittest discover`含自建临时SQLite夹具，本轮不再使用；此前误运行的执行偏差见[修复报告](doc/verification/2026-10-27-project-entry-python-startup.md)。
+
 在 PLCnext Linux 上运行独立 Agent，执行 PLC 子设备的数据采集配置。支持按设备增量 MQTT 下发；终端合并并保存完整配置，兼容既有完整快照入口。
+
+最新入口对账/重连分项见[2026-10-26报告](doc/verification/2026-10-26-events-reconnect.md)：2436事件完整前后缀、独立策略重算、2096真实STORED/本地释放及340时间无效明确拒绝；启动漏槽及全局unknown保留。测试脚本为 `tools/verify_event_live.py`，仅在既有开发SQLite已备份并显式迁移v2后使用，不创建临时数据库或更新长期运行镜像。
 
 当前交付为 **0.2.0**：独立 Agent 已形成可运行闭环。新增设备级 MQTT `config/patch` 入口，支持按设备增量操作和首次空网关引导；`config/set` 完整快照作为兼容入口保留。采集结果按报告策略写入 Outbox，经 `data` / `data/ack` 上报和补传。
 

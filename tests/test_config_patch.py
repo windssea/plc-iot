@@ -512,7 +512,8 @@ class PatchMqttTests(unittest.IsolatedAsyncioTestCase):
 
     async def exercise(self, retained):
         agent = SimpleNamespace(settings=SimpleNamespace(gateway_id='PLC-01'), state='WAITING_CONFIG',
-                                active_config_version=0, active_message_id=None)
+                                active_config_version=0, active_message_id=None,
+                                runtime=SimpleNamespace(boot_context=None))
         calls, published, subscriptions = [], [], []
         async def submit(payload, *, kind='configSet'):
             calls.append((payload, kind))

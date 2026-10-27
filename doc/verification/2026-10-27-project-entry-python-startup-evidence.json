@@ -1,0 +1,400 @@
+{
+  "schema": "joint-engineering-entry-python-startup/v1",
+  "date": "2026-10-27",
+  "atUtc": "2026-10-27T01:07:54.056579+00:00",
+  "status": "ENGINEERING_INPUTS_FROZEN_PYTHON_STARTUP_REAL_COHORT_PASS",
+  "engineeringCatalog": "projects/catalog.json",
+  "engineeringArchiveCheck": {
+    "archives": 3,
+    "stablePou": 32,
+    "candidatePou": 66,
+    "rootAliasMatchesCandidate": true,
+    "bytesPreserved": true,
+    "embeddedCandidateVersionIsLegacy": true
+  },
+  "isolatedBefore": {
+    "scope": "ISOLATED_REAL_TCP_50_UNIT_STARTUP",
+    "durationSeconds": 12.03200000000652,
+    "configSha256": "434271934e7ed51b87ada91e03aab50b6f77013c5d16f3bdc65f52343cef6ae8",
+    "devices": 50,
+    "points": 250,
+    "pollIntervalMs": 5000,
+    "globalReadCapacity": 16,
+    "endpointReadConcurrency": 1,
+    "acceptedConnections": 50,
+    "connectCalls": 50,
+    "connectDurationSumMs": 5596.000000077765,
+    "missedPollCycles": 161,
+    "missingPhysicalSlots": {
+      "1": 2,
+      "0": 159
+    },
+    "pointsWithPhysicalResults": 250,
+    "goodLatest": 250,
+    "captured": 839,
+    "physical": 589,
+    "activeConnectionsAfterStop": 0,
+    "sourceDrops": 0,
+    "minimumLastSlot": 2,
+    "physicalDevicesAccessed": false,
+    "databaseCreated": false,
+    "brokerConnected": false
+  },
+  "isolatedAfter": {
+    "scope": "ISOLATED_REAL_TCP_50_UNIT_STARTUP",
+    "durationSeconds": 12.01600000000326,
+    "configSha256": "434271934e7ed51b87ada91e03aab50b6f77013c5d16f3bdc65f52343cef6ae8",
+    "devices": 50,
+    "points": 250,
+    "pollIntervalMs": 5000,
+    "globalReadCapacity": 16,
+    "endpointReadConcurrency": 1,
+    "acceptedConnections": 1,
+    "connectCalls": 1,
+    "connectDurationSumMs": 108.99999999674037,
+    "missedPollCycles": 0,
+    "missingPhysicalSlots": {},
+    "pointsWithPhysicalResults": 250,
+    "goodLatest": 250,
+    "captured": 1000,
+    "physical": 750,
+    "activeConnectionsAfterStop": 0,
+    "sourceDrops": 0,
+    "minimumLastSlot": 2,
+    "physicalDevicesAccessed": false,
+    "databaseCreated": false,
+    "brokerConnected": false
+  },
+  "unitRegression": {
+    "tests": 376,
+    "passed": true,
+    "firstRunFailures": 2,
+    "firstRunErrors": 4,
+    "secondRunFailures": 1,
+    "oldFixtureCorrections": true,
+    "noSqliteGuardedTests": 55,
+    "noSqliteGuardedPassed": true,
+    "noSqliteGuardedDurationSeconds": 3.983
+  },
+  "realPython": {
+    "run": "boot-0407810aa7ea4d84915c27c6ee496a94",
+    "sessions": 2,
+    "captured": 2250,
+    "physical": 2000,
+    "qualityState": 250,
+    "sourcePolicyCohort": {
+      "scope": "CURRENT_BOOT_SOURCE_POLICY_WIRE_ACK_LOCAL_RELEASE",
+      "bootId": "boot-0407810aa7ea4d84915c27c6ee496a94",
+      "captured": 2250,
+      "eligible": 2250,
+      "filtered": 0,
+      "stored": 2250,
+      "knownUnsent": 0,
+      "timeInvalid": 0,
+      "batches": 42,
+      "missedReportSlots": 0,
+      "sessions": 2,
+      "sourcePrefixAndTailComplete": true,
+      "independentSelectionMatched": true,
+      "currentBootCohortComplete": true,
+      "globalAccountingComplete": false,
+      "priorVolatileRestartLoss": "UNKNOWN",
+      "oracleConfigFromHubRelease": true,
+      "databaseProofAttached": false,
+      "performanceAccepted": false
+    },
+    "databaseProof": {
+      "scope": "CAPTURED_WINDOW_REAL_RECEIPTS_AND_SAMPLE_MULTISET",
+      "gatewayId": "PLC-UI-DEMO",
+      "wireEvidencePath": "D:\\work\\code\\PLCnext-Hub-Backend\\logs\\joint-timesync\\startup-20261027-wire.json",
+      "wireEvidenceSha256": "df1cb43ccb6653b4c146da1017a071d330c664496bd3f6b54f2b45470907e0bb",
+      "bootIds": [
+        "boot-0407810aa7ea4d84915c27c6ee496a94"
+      ],
+      "receiptHashesVerified": 42,
+      "committedSampleMultisetVerified": 2250,
+      "wireValues": 2250,
+      "distinctPoints": 250,
+      "timeRequestCount": 8,
+      "timeResponsesExactEchoVerified": 6,
+      "dataAfterObservedTimeResponses": false,
+      "normalizedTwoAgentConfigEqual": true,
+      "configDevices": 50,
+      "configPoints": 250,
+      "fullEventCohortComplete": false,
+      "nativeLocalReleaseAllProven": false,
+      "performanceAccepted": false,
+      "databaseWrites": false,
+      "temporaryDatabaseCreated": false,
+      "fakeDataOrAckPublished": false
+    },
+    "combinedDatabaseProofAttached": true,
+    "missedPolls": 0,
+    "missedReportSlots": 0,
+    "pending": 0,
+    "dead": 0,
+    "sourcePrefixAndTailComplete": true,
+    "all250Good": true,
+    "allDataSubmittedAfterSessionTimeAndControls": true,
+    "logicalClockSource": "HUB_MQTT",
+    "injectedSystemDateOnly": 946684800000
+  },
+  "slotComparison": {
+    "scope": "SEPARATE_RUNS_ACTIVATION_RELATIVE_PHYSICAL_SLOT_COMPARISON",
+    "comparisonOutcome": "VALUE_QUALITY_SELECTION_MATCH",
+    "canonicalPoints": 250,
+    "pythonPhysicalResults": 2000,
+    "nativePhysicalResults": 1532,
+    "pairedSlots": 1532,
+    "exactValueQualitySelectionMatches": 1532,
+    "mismatches": [],
+    "commonCoverageBySlot": {
+      "0": 250,
+      "1": 250,
+      "2": 250,
+      "3": 250,
+      "4": 250,
+      "5": 250,
+      "6": 32
+    },
+    "fullPointCoverageSlots": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "pythonMissingWithinCommonHorizon": 0,
+    "nativeMissingWithinCommonHorizon": 0,
+    "bothMissingWithinCommonHorizon": 0,
+    "pythonWindowTailOnly": 468,
+    "nativeWindowTailOnly": 0,
+    "availableTimeQualificationDifferences": 450,
+    "physicalOriginIsFirstActivation": true,
+    "reportEpochOriginNeverRenumbersPhysicalSlots": true,
+    "numericComparison": "EXACT_BINARY64_NO_EPSILON_OR_DISPLAY_ROUNDING",
+    "utcComparedAcrossBoots": false,
+    "simultaneousInputReplayProven": false,
+    "nativeDecisionTimeClockSeparatelyAttested": false,
+    "fullDeliveryCohortComplete": false,
+    "zeroMissedPolls": null,
+    "globalAccountingComplete": false,
+    "performanceAccepted": false,
+    "pythonBoot": "boot-0407810aa7ea4d84915c27c6ee496a94",
+    "nativeBoot": "ng-d4f61b3085b97c5e3831983b-71",
+    "pythonRecordedMissedPolls": 0,
+    "inputFiles": [
+      {
+        "path": "D:\\work\\code\\PLCnext-iot\\.local\\startup-20261027\\live-reconnect.json",
+        "sha256": "cb562619d11a03e84689ad569ff8ef3bb3d0a17164d8067343bdbec57c8ddcd3"
+      },
+      {
+        "path": "D:\\work\\code\\PLCnext-iot\\.local\\startup-20261027\\live-reconnect.audit.jsonl",
+        "sha256": "8f97adab392317ceeeb5b2e6a84651cdcaede12a67a0657c82e302dcf24c0c2a"
+      },
+      {
+        "path": "logs\\joint-timesync\\events-python-release1.json",
+        "sha256": "bbc2a580070781438fe226b2cc98b73317b92a8d9a60adedb4c49adae630df2f"
+      },
+      {
+        "path": "D:\\PLCnext-MCP-Workspace\\f40a214f31ea4ec28b5d9fd39c77c5ee\\audit-exports\\8c8a89b4bff24f0291cc7b071db44459\\events.jsonl",
+        "sha256": "914b025bfa344cf1ed4934a828367cbba491242dc9036d79b01d74d18ab33b2f"
+      },
+      {
+        "path": "D:\\PLCnext-MCP-Workspace\\f40a214f31ea4ec28b5d9fd39c77c5ee\\audit-exports\\8c8a89b4bff24f0291cc7b071db44459\\result.json",
+        "sha256": "ffb61125400c1fd72122090a61c938a433d693b6f17bd3b2b56bfe88504fac5c"
+      },
+      {
+        "path": "logs\\joint-timesync\\m12s-native-release13.json",
+        "sha256": "434271934e7ed51b87ada91e03aab50b6f77013c5d16f3bdc65f52343cef6ae8"
+      }
+    ]
+  },
+  "sqliteRestore": {
+    "agent": {
+      "restored": true,
+      "integrity": "ok"
+    },
+    "telemetry": {
+      "restored": true,
+      "integrity": "ok"
+    }
+  },
+  "services": {
+    "atUtc": "2026-10-27T01:07:47.0036392Z",
+    "backend8080Pids": [
+      27204
+    ],
+    "listeners": [
+      {
+        "LocalPort": 8080,
+        "OwningProcess": 27204
+      },
+      {
+        "LocalPort": 18080,
+        "OwningProcess": 23716
+      },
+      {
+        "LocalPort": 11502,
+        "OwningProcess": 23716
+      },
+      {
+        "LocalPort": 8090,
+        "OwningProcess": 35404
+      }
+    ],
+    "mockDeviceCount": 50,
+    "mockRunningCount": 50,
+    "mockGood": 250,
+    "mockConfigError": null,
+    "activeVerificationPids": []
+  },
+  "historical314Preserved": true,
+  "fullJointAcceptanceComplete": false,
+  "globalAccountingComplete": false,
+  "priorVolatileRestartLoss": "UNKNOWN",
+  "performanceRetestsPaused": true,
+  "plcAccessedThisTurn": false,
+  "plcDownloaded": false,
+  "sharedServicesRestarted": false,
+  "newDevelopmentDatabaseCreated": false,
+  "existingSqliteOnlyForLiveTest": true,
+  "sqliteBackupUsedAsRuntimeDatabase": false,
+  "unitTestsUseOwnedTemporaryFixtures": true,
+  "gitCommitted": false,
+  "rawEvidence": [
+    {
+      "path": "D:\\work\\code\\PLCnext-iot\\.local\\startup-20261027\\before.json",
+      "sha256": "08bc7fafd1da9f54880c838c2a33ad0891238d936c617d0d0c41b58c660cc149"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-iot\\.local\\startup-20261027\\after.json",
+      "sha256": "9dfe9704a83649d98a282c6bba3e6011c8d55c0f54a073bc36530b332681067e"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-iot\\.local\\startup-20261027\\regression.log",
+      "sha256": "71de4442b432870f582cf309d6c97959c8bc3afbe993d96557ee598504cce53d"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-iot\\.local\\startup-20261027\\regression-final.log",
+      "sha256": "fb7483c0b5b442c3a1c94867fc0af545820c5f7485b99b6eabbc531a98d840e2"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-iot\\.local\\startup-20261027\\regression-complete.log",
+      "sha256": "45dcbaadf2fe0f2ff4423c8e97b6a512df691b446e779e08835668dd0c644fd7"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-iot\\.local\\startup-20261027\\source-manifest.json",
+      "sha256": "9498bf21ec587da86d041ddfa4d0cd138691c6554d58a43a8b2317314a66dae4"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-iot\\.local\\startup-20261027\\live-reconnect.json",
+      "sha256": "cb562619d11a03e84689ad569ff8ef3bb3d0a17164d8067343bdbec57c8ddcd3"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-iot\\.local\\startup-20261027\\live-reconnect.audit.jsonl",
+      "sha256": "8f97adab392317ceeeb5b2e6a84651cdcaede12a67a0657c82e302dcf24c0c2a"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-iot\\.local\\startup-20261027\\live-reconnect.config.json",
+      "sha256": "6456867850b061d0d904f83bbed63eaab073edad7832cc62fc16d23f49565523"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-iot\\.local\\startup-20261027\\live-backup\\manifest.json",
+      "sha256": "29e6682ed8f2d09cd5cb2e75e15d99e4f81d9645c56ede06197e11b7a95a4edf"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-iot\\.local\\startup-20261027\\live-backup\\restore.json",
+      "sha256": "f4ba3170311894e9aad080c91c8ea1a5b70952b193e235c72cd28bf76cd48ad9"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-iot\\.local\\startup-20261027\\service-final.json",
+      "sha256": "edaea4db56fa5e46d3c40d5d890c6c2e28c45d46851d4b4a7cc57e43abe6a4b8"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-Hub-Backend\\logs\\joint-timesync\\startup-20261027-wire.json",
+      "sha256": "df1cb43ccb6653b4c146da1017a071d330c664496bd3f6b54f2b45470907e0bb"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-Hub-Backend\\logs\\joint-timesync\\startup-20261027-cohort.json",
+      "sha256": "a3c133f05b7dcf4034c625f2b76e43612a6554f298d34329269c6e03091b65c7"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-Hub-Backend\\logs\\joint-timesync\\startup-20261027-cohort.mapping.json",
+      "sha256": "2abcf38027a48f804470ee5a26f74c3a81d5b608402484b053e4d68d656efcc5"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-Hub-Backend\\logs\\joint-timesync\\startup-20261027-db-proof.json",
+      "sha256": "0bded6a25e26143de2f41e65e741a57e92481da2aec85a25c2c2fb306ec87bba"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-Hub-Backend\\logs\\joint-timesync\\startup-20261027-slots.json",
+      "sha256": "8dd4bb95e2562870f53594ca4c6014a940fbccb0f017c4346307e7383b24a6dd"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-Hub-Backend\\logs\\joint-timesync\\startup-20261027-slots.slots.json",
+      "sha256": "8fa11562f04b9e04e6ff00f92a5a30d6d442cf59d4162ff426df6afaf5662eba"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-Hub-Backend\\logs\\joint-timesync\\events-python-release1.json",
+      "sha256": "bbc2a580070781438fe226b2cc98b73317b92a8d9a60adedb4c49adae630df2f"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-Engineer\\projects\\catalog.json",
+      "sha256": "7ad39a07bd57dccc0cd98d4bb8687fafe6b9a91d3324f1d986bb0aa1d25d0b1b"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-Engineer\\NativeGateway.pcwex",
+      "sha256": "b585662abf3d86a1d0445d59e9ed4354723edebafd1f0fcb4b81647a7fe80d41"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-iot\\.local\\startup-20261027\\frozen-sources\\before-drivers-modbus.py",
+      "sha256": "bd7b9ad45543062e12749873eb17f1ae0008900eccb3a6fa822b7aca486716c1"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-iot\\.local\\startup-20261027\\frozen-sources\\before-devices-runtime.py",
+      "sha256": "fc00635804aacc60140787e37d66332bed27aa670ad255647a6374082e7908ec"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-iot\\.local\\startup-20261027\\frozen-sources\\before-devices-modbus.py",
+      "sha256": "ecde359c4c4beea20f6808b57a0b17fb9de11bfe657012a6f8acfb4c6eedf8c2"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-iot\\.local\\startup-20261027\\frozen-sources\\after-drivers-modbus.py",
+      "sha256": "0cf1445e76814e344b9bb3c236cf9cfa669136f06422e6314829a2314975050e"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-iot\\.local\\startup-20261027\\frozen-sources\\after-devices-runtime.py",
+      "sha256": "4030162a73d83f22b2e3f8a32720de4df3fffba7441b20a3da5fe6470bdb27a4"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-iot\\.local\\startup-20261027\\frozen-sources\\after-devices-modbus.py",
+      "sha256": "c19dc710925a8eb8e05bb05a92e05fcb567f874b803c608b034f311dc1a16f7b"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-iot\\.local\\startup-20261027\\frozen-sources\\after-tests-test_modbus_pool.py",
+      "sha256": "a11b768860bd811c2078803f1c08894e89a246007311010e9df63374f455c921"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-iot\\.local\\startup-20261027\\frozen-sources\\after-tools-verify_modbus_startup.py",
+      "sha256": "f0788dd122a5b8c31f3fb2c6783d1cffcc702db87e27531376bffdea0f044eff"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-iot\\tools\\run_startup_regression.py",
+      "sha256": "f3c2f65d077b8d5f27f79b1b80ec949ef2d7243398604449945ff013b67bb241"
+    },
+    {
+      "path": "D:\\work\\code\\PLCnext-iot\\.local\\startup-20261027\\no-sqlite-regression.log",
+      "sha256": "c2dd1aa5e51651c08284c716b6ace813290977eaed1bb422adc456d1aa0c9e07"
+    }
+  ],
+  "databaseConstraintDeviation": {
+    "occurred": true,
+    "scope": "Full unittest discovery used self-owned temporary SQLite fixtures despite the no-new-database constraint; fixtures cleaned by the tests.",
+    "liveDevelopmentDatabaseCreated": false,
+    "existingLiveSqliteRestored": true,
+    "correctedEntry": "tools/run_startup_regression.py",
+    "correctedEntryRejectsAllSqliteConnections": true
+  }
+}

@@ -2,6 +2,7 @@
 import asyncio
 import math
 import struct
+from dataclasses import dataclass, field
 
 from pymodbus.client import AsyncModbusTcpClient
 from pymodbus.exceptions import ConnectionException, ModbusException
@@ -53,16 +54,71 @@ async def _bounded(coro, seconds):
         await asyncio.gather(task, return_exceptions=True)
 
 
+@dataclass
+class _EndpointConnection:
+    client: object = None
+    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    references: int = 0
+
+    def disconnect(self):
+        if self.client is not None:
+            self.client.close()
+            self.client = None
+
+
+class ModbusConnectionPool:
+    """One serial socket per endpoint, scoped to a DeviceRuntime, not a process.
+
+    Entries exist only while readers own them; failed/cancelled requests discard
+    the socket while holding its lock, before another unit can reuse the entry.
+    """
+    def __init__(self, capacity=50):
+        if type(capacity) is not int or not 1 <= capacity <= 50:
+            raise ValueError('Modbus endpoint capacity must be 1..50')
+        self.capacity = capacity
+        self._entries = {}
+
+    def retain(self, connection):
+        key = connection.host.lower(), connection.port
+        if key not in self._entries:
+            if len(self._entries) >= self.capacity:
+                raise RuntimeError('Modbus endpoint capacity exceeded')
+            self._entries[key] = _EndpointConnection()
+        entry = self._entries[key]
+        entry.references += 1
+        return entry
+
+    def release(self, connection, entry):
+        key = connection.host.lower(), connection.port
+        assert self._entries.get(key) is entry and entry.references > 0
+        entry.references -= 1
+        if entry.references == 0:
+            entry.disconnect()
+            del self._entries[key]
+
+
 class ModbusReader:
-    def __init__(self, connection):
+    def __init__(self, connection, pool=None):
         self.connection = connection
-        self._client = None
-        self._lock = asyncio.Lock()
+        self._pool = pool
+        self._released = False
+        self._endpoint = pool.retain(connection) if pool is not None else _EndpointConnection()
+        self._lock = self._endpoint.lock
+
+    @property
+    def _client(self):
+        return self._endpoint.client
+
+    @_client.setter
+    def _client(self, value):
+        self._endpoint.client = value
 
     def close(self):
-        if self._client is not None:
-            self._client.close()
-            self._client = None
+        if self._pool is None:
+            self._endpoint.disconnect()
+        elif not self._released:
+            self._released = True
+            self._pool.release(self.connection, self._endpoint)
 
     async def read(self, point):
         values = await self._read_raw(ReadBlock(point.modbus.area, point.modbus.address,
@@ -105,6 +161,8 @@ class ModbusReader:
     async def _read_raw(self, block, retries=None):
         retries = self.connection.retry_count if retries is None else retries
         async with self._lock:
+            if self._released:
+                raise ReadError('BAD_CONNECTION')
             for attempt in range(retries + 1):
                 try:
                     return await self._read_once(block)
@@ -118,9 +176,13 @@ class ModbusReader:
         connecting = self._client is None or not self._client.connected
         try:
             if connecting:
-                self.close()
+                self._endpoint.disconnect()
+                # The outer per-call deadlines remain authoritative. A socket
+                # reused by another unit must not inherit a shorter SDK timeout
+                # from its first owner (contract maximum is 300 seconds).
+                sdk_timeout = 301 if self._pool is not None else max(c.connect_timeout_ms, c.request_timeout_ms) / 1000 + 1
                 self._client = AsyncModbusTcpClient(c.host, port=c.port, retries=0, reconnect_delay=0,
-                    timeout=max(c.connect_timeout_ms, c.request_timeout_ms) / 1000 + 1)
+                    timeout=sdk_timeout)
                 if not await _bounded(self._client.connect(), c.connect_timeout_ms / 1000):
                     raise ReadError('BAD_CONNECTION')
                 connecting = False
@@ -138,20 +200,20 @@ class ModbusReader:
                 raise ReadError('BAD_PROTOCOL')
             return values
         except asyncio.CancelledError:
-            self.close()
+            self._endpoint.disconnect()
             raise
         except TimeoutError as exc:
             disconnected = self._client is None or not self._client.connected
-            self.close()
+            self._endpoint.disconnect()
             raise ReadError('BAD_CONNECTION' if connecting or disconnected else 'BAD_TIMEOUT') from exc
         except (OSError, ConnectionException) as exc:
-            self.close()
+            self._endpoint.disconnect()
             raise ReadError('BAD_CONNECTION') from exc
         except ModbusException as exc:
             disconnected = self._client is None or not self._client.connected
-            self.close()
+            self._endpoint.disconnect()
             raise ReadError('BAD_CONNECTION' if disconnected else 'BAD_PROTOCOL') from exc
         except ReadError as exc:
             if exc.quality == 'BAD_CONNECTION':
-                self.close()
+                self._endpoint.disconnect()
             raise

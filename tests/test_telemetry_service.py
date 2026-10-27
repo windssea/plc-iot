@@ -16,9 +16,13 @@ class TelemetryServiceTests(unittest.IsolatedAsyncioTestCase):
     async def test_close_flushes_pending_sample_and_restart_preserves_batch(self):
         self.assertTrue((ROOT/'src/plcnext_iot/reporting/service.py').exists(),'Telemetry pipeline missing')
         from plcnext_iot.reporting.service import TelemetryPipeline
+        from plcnext_iot.core.sample_time import CaptureTime
+        from types import SimpleNamespace
+        import time
         runtime=DeviceRuntime()
         runtime.snapshot=ConfigSnapshot.parse((ROOT/'contracts/examples/valid/config-set.json').read_bytes(),'PLC-01')
-        samples=SampleBuffer()
+        samples=SampleBuffer(time_provider=SimpleNamespace(
+            read=lambda mono_ms:CaptureTime(time.time_ns()//1_000_000,True,1)))
         with tempfile.TemporaryDirectory() as directory:
             pipeline=TelemetryPipeline(runtime,samples,Path(directory),'PLC-01')
             await pipeline.start()
@@ -29,7 +33,9 @@ class TelemetryServiceTests(unittest.IsolatedAsyncioTestCase):
             second=TelemetryPipeline(runtime,SampleBuffer(),Path(directory),'PLC-01')
             await second.start()
             try:
-                stats=await second.stats()
+                # The public diagnostics cache refreshes asynchronously. This
+                # test asserts durable restart contents, not a just-started cache.
+                stats=await second.storage.call('stats')
                 self.assertEqual(stats['pending'],1)
                 original=await second.storage.call('reserve',0,False)
                 self.assertEqual(json.loads(original)['values'][0]['value'],230)

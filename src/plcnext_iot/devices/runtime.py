@@ -12,6 +12,7 @@ from typing import Callable, Protocol
 
 from plcnext_iot.config.models import ConfigSnapshot, DeviceConfig
 from plcnext_iot.devices.budget import ReadBudget
+from plcnext_iot.drivers.modbus import ModbusConnectionPool
 from plcnext_iot.core.boot import ProcessBootContext
 
 
@@ -48,6 +49,7 @@ class DeviceRuntime:
         self._factory = factory
         self.boot_context = boot_context or ProcessBootContext()
         self.read_budget = ReadBudget()
+        self.modbus_connections = ModbusConnectionPool()
         self._runners = {}
         self._managed = {}
         self._pending = None

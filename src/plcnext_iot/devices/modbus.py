@@ -21,7 +21,7 @@ class ModbusRunner:
     async def start(self):
         if self._task is not None and not self._task.done():
             return
-        self._reader = ModbusReader(self.device.connection)
+        self._reader = ModbusReader(self.device.connection, self.runtime.modbus_connections)
         self.last_error = None
         self._task = asyncio.create_task(self._poll(), name='modbus:' + self.device.device_id)
 

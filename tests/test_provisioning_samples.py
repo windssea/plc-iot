@@ -74,7 +74,7 @@ class LiveSamplesTests(unittest.IsolatedAsyncioTestCase):
 
     def put(self, value=0, quality='GOOD', version=10, captured=9, timestamp=1000):
         self.runtime.runners['meter-A'].latest['voltage'] = Sample(
-            version, 'meter-A', 'voltage', timestamp, value, quality, captured)
+            version, 'meter-A', 'voltage', timestamp, value if quality == 'GOOD' else None, quality, captured)
 
     async def test_zero_false_and_null_are_not_truthy_filtered(self):
         self.put(0)
@@ -118,8 +118,13 @@ class LiveSamplesTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.shown()[1]['points'][0]['quality'], 'BAD_INTERNAL_ERROR')
 
     async def test_invalid_good_values_never_emit_non_json_numbers_or_wrong_types(self):
+        from types import SimpleNamespace
         for value in (float('nan'), float('inf'), 'password-value', True, None):
-            self.put(value)
+            # Deliberately malformed legacy/foreign view: production Sample
+            # rejects nonfinite/non-numeric GOOD values before this boundary.
+            self.runtime.runners['meter-A'].latest['voltage'] = SimpleNamespace(
+                config_version=10, device_id='meter-A', point_id='voltage',
+                timestamp=1000, value=value, quality='GOOD', monotonic_time=9)
             result = self.shown()[1]
             self.assertEqual(result['points'][0]['quality'], 'BAD_TYPE_MISMATCH')
             self.assertIsNone(result['points'][0]['value'])

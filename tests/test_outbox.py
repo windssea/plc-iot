@@ -77,10 +77,18 @@ class OutboxTests(unittest.TestCase):
         self.assertEqual(self.store.stats()['dropped'],1)
         self.assertEqual(self.store.stats()['pending'],3)
 
-    def test_expiry_and_dead_letter_retention_are_bounded(self):
+    def test_untrusted_age_is_retained_and_dead_letter_retention_is_bounded(self):
         for i in range(3):
             self.store.enqueue(self.payload('b'+str(i)),0)
-        self.assertIsNone(self.reserve(7*86400+1,False))
+        # An arbitrary wall clock cannot authorize AGE_EXPIRED. Trusted age
+        # boundaries are exercised separately in test_timed_outbox.py.
+        start = 7*86400+1
+        self.assertEqual(self.reserve(start,False),self.payload('b0'))
+        self.assertEqual(self.store.stats()['pending'],3)
+        for i in range(3):
+            if i:
+                self.assertEqual(self.reserve(start+i,False),self.payload('b'+str(i)))
+            self.assertTrue(self.store.acknowledge(self.ack('b'+str(i),status='REJECTED',code='INVALID_TIMESTAMP'),start+i))
         stats=self.store.stats()
         self.assertEqual((stats['pending'],stats['dead'],stats['dead_pruned']),(0,1,2))
 
