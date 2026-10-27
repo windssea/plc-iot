@@ -2,6 +2,7 @@
 import asyncio
 import json
 import time
+from dataclasses import replace
 from collections import deque
 
 from plcnext_iot.core.storage_worker import StoreWorker
@@ -12,6 +13,7 @@ from plcnext_iot.storage.outbox_session import OutboxSession
 from plcnext_iot.core.storage_worker import WorkerFull
 from plcnext_iot.config.store import StoreError,StoreIdentityError
 from plcnext_iot.messaging.transport import PublishRejected
+from plcnext_iot.core.platform_time import TimeUnavailable
 
 
 class TelemetryPipeline:
@@ -26,6 +28,7 @@ class TelemetryPipeline:
             raise ValueError('Telemetry boot identity does not match its process context')
         self.engine=ReportEngine(gateway,context.boot_id,boot_context=context)
         self.context=context
+        self.time_provider=getattr(context,'time_provider',None)
         if context.outbox_session is None:
             context.outbox_session=OutboxSession(on_fact=on_fact,accounting=context.accounting)
         elif on_fact is not None:
@@ -36,7 +39,7 @@ class TelemetryPipeline:
                 and (self.session.entries or self.session.staged)):
             raise StoreIdentityError('Pending telemetry belongs to the previous gateway/directory')
         context.telemetry_owner=owner
-        factory=store_factory or (lambda path,gateway:OutboxStore(path,gateway,session=self.session))
+        factory=store_factory or (lambda path,gateway:OutboxStore(path,gateway,session=self.session,time_provider=self.time_provider))
         self.storage=StoreWorker(directory/'telemetry.db',gateway,factory,max_bytes=2*1024*1024,detachable=True)
         if close_timeout<=0:
             raise ValueError('Close timeout must be positive')
@@ -65,6 +68,9 @@ class TelemetryPipeline:
             raise StoreError('Previous telemetry close failed')
         try:
             await self.storage.open()
+            if self.time_provider is not None and self.time_provider.platform:
+                boundary=await self.storage.call('time_boundary')
+                self.time_provider.load_history_boundary(boundary['basis'],boundary['utc_lower'])
         except BaseException:
             await self.storage.close()
             raise
@@ -74,6 +80,10 @@ class TelemetryPipeline:
 
     def _accept(self,sample):
         discarded=self.engine.discarded
+        if self.time_provider is not None and self.time_provider.platform:
+            current=self.time_provider.snapshot()
+            if not current.time_valid or sample.clock_revision!=current.clock_revision:
+                sample=replace(sample,time_valid=False,time_source='HUB_MQTT')
         try:
             self.engine.accept(sample,asyncio.get_running_loop().time())
         except Exception:
@@ -101,7 +111,13 @@ class TelemetryPipeline:
 
     async def _flush(self,force=False):
         now=asyncio.get_running_loop().time()
-        batches=self.engine.prepare(now,time.time_ns()//1_000_000,force=force)
+        token=self.time_provider.token() if getattr(self,'time_provider',None) is not None else None
+        if getattr(self,'time_provider',None) is not None:
+            try:reading=self.time_provider.require(token,'ENQUEUE')
+            except TimeUnavailable:return
+            stamp=reading.utc_ms if reading.time_valid else reading.system_utc_ms
+        else:stamp=time.time_ns()//1_000_000
+        batches=self.engine.prepare(now,stamp,force=force)
         groups={c:deque(b for b in batches if self.engine._classes.get(b.sequence,'new')==c) for c in ('new','history')}
         while any(groups.values()):
             if getattr(self,'_deadline',None) is not None and asyncio.get_running_loop().time()>=self._deadline:
@@ -113,6 +129,9 @@ class TelemetryPipeline:
             args=(batch.payload,time.time())
             if hasattr(self,'session'):
                 args+= (dict(events=tuple(s.sample_seq for s in batch.samples),capture_boot=self.engine.boot_id),)
+            if getattr(self,'time_provider',None) is not None:
+                token=self.time_provider.token()
+                args+=(token,)
             try:
                 accepted=await self.storage.call('enqueue',*args)
             except WorkerFull:
@@ -133,7 +152,7 @@ class TelemetryPipeline:
                     if now>=self._stats_at:
                         self._cache=await self.storage.call('stats')
                         self._stats_at=now+1
-                except (StoreError,WorkerFull):
+                except (StoreError,WorkerFull,TimeUnavailable):
                     self.enqueue_attempt_failures+=1
                 await asyncio.sleep(.025)
         except Exception:
@@ -181,9 +200,15 @@ class TelemetryPipeline:
                     if task.done():
                         publishes.remove(task);task.result()
                 if len(publishes)<8:
+                    if self.time_provider is not None and not self.time_provider.valid(None,'SEND'):
+                        await asyncio.sleep(.025)
+                        continue
                     try:
-                        payload=await self.storage.call('reserve',time.time())
-                    except (StoreError,WorkerFull):
+                        if self.time_provider is not None:
+                            payload=await self.storage.call('reserve',None,None,self.time_provider.token())
+                        else:
+                            payload=await self.storage.call('reserve',time.time())
+                    except (StoreError,WorkerFull,TimeUnavailable):
                         payload=None
                     if payload is not None:
                         key=json.loads(payload)['messageId']
@@ -201,6 +226,8 @@ class TelemetryPipeline:
                             await self.storage.call('submission_failed',key)
                             break
                         try:
+                            if self.time_provider is not None:
+                                self.time_provider.require(self.time_provider.token(),'SEND')
                             self.session.sdk_next_send=now+.25
                             self.session.sdk_rate.append((now,len(payload)))
                             # No await between recheck and SDK acceptance.
@@ -211,6 +238,9 @@ class TelemetryPipeline:
                             else:
                                 task=asyncio.create_task(connection.publish(topic,payload))
                             publishes.add(task)
+                        except TimeUnavailable:
+                            await self.storage.call('submission_failed',key)
+                            continue
                         except PublishRejected:
                             await self.storage.call('submission_failed',key)
                             raise
@@ -244,14 +274,19 @@ class TelemetryPipeline:
                     enqueue_attempt_failures=self.enqueue_attempt_failures,
                     shutdown_volatile_events=self.shutdown_volatile_events,
                     shutdown_unsettled_events=self.shutdown_unsettled_events,
-                    outbox_stats_cached=True,diagnostics=self.diagnostics_snapshot())
+                    outbox_stats_cached=True,diagnostics=self.diagnostics_snapshot(),
+                    time=self.time_provider.diagnostics() if self.time_provider is not None else None)
 
     def diagnostics_snapshot(self):
         if not self.session.accounting_complete:self.context.accounting.incomplete()
         if self.session.detail_truncated:self.context.accounting.incomplete(truncated=True)
         if self.session.counter_overflow:self.context.accounting.incomplete(overflow=True)
         return dict(self.context.accounting.snapshot(),gatewayId=self.engine.gateway,bootId=self.context.boot_id,
-                    timeMode='SYSTEM_RTC_COMPAT_UNVERIFIED')
+                    timeMode='HUB_MQTT' if self.time_provider is not None and self.time_provider.platform else 'SYSTEM_RTC_COMPAT_UNVERIFIED',
+                    time=self.time_provider.diagnostics() if self.time_provider is not None else None,
+                    outboxTime=dict(ageUnknownBatches=self._cache.get('age_unknown_batches'),
+                                    maintenanceBatches=self._cache.get('maintenance_batches'),
+                                    cacheAgeSeconds=max(0,time.monotonic()-(self._stats_at-1))))
 
     async def wait_failed(self):
         await self._failed.wait()

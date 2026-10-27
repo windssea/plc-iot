@@ -99,6 +99,24 @@
       "retain": false,
       "maxPayloadBytes": 131072,
       "schema": "protocol.schema.json#/$defs/configPatchAck"
+    },
+    {
+      "kind": "timeRequest",
+      "suffix": "time/request",
+      "direction": "from_agent",
+      "qos": 1,
+      "retain": false,
+      "maxPayloadBytes": 2048,
+      "schema": "protocol.schema.json#/$defs/timeRequest"
+    },
+    {
+      "kind": "timeResponse",
+      "suffix": "time/response",
+      "direction": "to_agent",
+      "qos": 1,
+      "retain": false,
+      "maxPayloadBytes": 2048,
+      "schema": "protocol.schema.json#/$defs/timeResponse"
     }
   ]
 }

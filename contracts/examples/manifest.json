@@ -131,5 +131,15 @@
     "file": "valid/config-patch-ack.json",
     "kind": "configPatchAck",
     "valid": true
+  },
+  {
+    "file": "valid/time-request.json",
+    "kind": "timeRequest",
+    "valid": true
+  },
+  {
+    "file": "valid/time-response.json",
+    "kind": "timeResponse",
+    "valid": true
   }
 ]

@@ -43,11 +43,11 @@ def identity(payload, gateway):
         return None
 
 
-def _base(gateway):
-    return {'schemaVersion':1,'gatewayId':gateway,'timestamp':time.time_ns() // 1_000_000}
+def _base(gateway,timestamp=None):
+    return {'schemaVersion':1,'gatewayId':gateway,'timestamp':time.time_ns() // 1_000_000 if timestamp is None else timestamp}
 
 
-def config_ack(payload, result, gateway):
+def config_ack(payload, result, gateway, *, timestamp=None):
     request = identity(payload, gateway)
     if request is None or result.active_config_version is None:
         return None
@@ -66,12 +66,12 @@ def config_ack(payload, result, gateway):
                 'message':'Configuration could not be applied.'}
     errors = [] if result.status == 'APPLIED' else (
         [error(issue.code, issue.path) for issue in result.issues[:32]] or [error(result.code)])
-    wire = encode(dict(_base(gateway),messageId=message_id,configVersion=version,
+    wire = encode(dict(_base(gateway,timestamp),messageId=message_id,configVersion=version,
                        activeConfigVersion=result.active_config_version,status=result.status,errors=errors))
     return None if validate_message('configAck',wire,expected_gateway_id=gateway) else wire
 
 
-def config_patch_ack(payload, result, gateway):
+def config_patch_ack(payload, result, gateway, *, timestamp=None):
     request = identity(payload, gateway)
     if request is None or result.active_config_version is None:
         return None
@@ -89,22 +89,22 @@ def config_patch_ack(payload, result, gateway):
                     message='Device command could not be applied.')
     errors = [] if result.status == 'APPLIED' else (
         [error(issue.code, issue.path) for issue in result.issues[:32]] or [error(result.code)])
-    wire = encode(dict(_base(gateway), messageId=message_id, configVersion=version,
+    wire = encode(dict(_base(gateway,timestamp), messageId=message_id, configVersion=version,
                        appliedConfigVersion=result.applied_config_version,
                        activeConfigVersion=result.active_config_version,
                        activeMessageId=result.active_message_id, status=result.status, errors=errors))
     return None if validate_message('configPatchAck', wire, expected_gateway_id=gateway) else wire
 
 
-def config_get(gateway, version, session, *, active_message_id=None, capabilities=False):
+def config_get(gateway, version, session, *, active_message_id=None, capabilities=False,timestamp=None):
     extras = (dict(configCapabilities=['devicePatchV1'], activeMessageId=active_message_id)
               if capabilities else {})
-    return encode(dict(_base(gateway),messageId='get-' + uuid.uuid4().hex,
+    return encode(dict(_base(gateway,timestamp),messageId='get-' + uuid.uuid4().hex,
                        activeConfigVersion=version,sessionId=session, **extras))
 
 
-def status(gateway, session, online, reason):
-    result = dict(_base(gateway),sessionId=session,online=online,reason=reason)
+def status(gateway, session, online, reason, *, timestamp=None):
+    result = dict(_base(gateway,timestamp),sessionId=session,online=online,reason=reason)
     if reason == 'connection_lost':
         result['timestamp'] = None
     return encode(result)

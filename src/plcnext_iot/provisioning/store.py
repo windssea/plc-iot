@@ -19,6 +19,14 @@ from plcnext_iot.messaging.settings import MqttSettings
 FIELDS = {'gatewayId','host','port','tls','username','password','caPem'}
 
 
+def time_settings(value):
+    timing = value.get('time', {})
+    if not isinstance(timing, dict) or set(timing)-{'mode','timeBasisRef','maxDriftPpm','driftEvidence'}:
+        raise SettingsError()
+    return dict(time_mode=timing.get('mode','SYSTEM_RTC'), time_basis_ref=timing.get('timeBasisRef'),
+                drift_ppm=timing.get('maxDriftPpm'), drift_evidence=timing.get('driftEvidence'))
+
+
 class SettingsError(ValueError):
     """Rejection that carries a stable code the setup page can explain."""
 
@@ -33,14 +41,14 @@ def parse(payload):
         raise SettingsError()
     try:
         value = json.loads(payload.decode('utf-8'), object_pairs_hook=_unique)
-        if set(value) != FIELDS:
+        if not isinstance(value, dict) or not FIELDS <= set(value) or set(value)-FIELDS-{'time'}:
             raise SettingsError()
         for field, limit in [('username',256),('password',4096),('caPem',16384)]:
             if not isinstance(value[field],str) or len(value[field]) > limit:
                 raise SettingsError()
         AgentSettings(value['gatewayId'], Path('.'))
         MqttSettings(value['host'],value['port'],value['tls'],
-                     username=value['username'] or None, password=value['password'] or None)
+                     username=value['username'] or None, password=value['password'] or None, **time_settings(value))
         if value['caPem']:
             if not value['tls']:
                 raise SettingsError()
@@ -97,15 +105,19 @@ def parse_update(payload, existing):
             ca = value['caPem'] or existing['caPem']
 
         AgentSettings(existing['gatewayId'], Path('.'))
-        MqttSettings(value['host'],value['port'],value['tls'],username=username,password=password)
+        MqttSettings(value['host'],value['port'],value['tls'],username=username,password=password, **time_settings(existing))
         if ca:
             ssl.create_default_context(cadata=ca)
     except SettingsError:
         raise   # already carries the code the page needs to explain it
     except (ValueError, TypeError, KeyError, UnicodeError, ssl.SSLError, RecursionError):
         raise SettingsError() from None
-    return {'gatewayId':existing['gatewayId'],'host':value['host'],'port':value['port'],
-            'tls':value['tls'],'username':username or '','password':password or '','caPem':ca}
+    merged = {'gatewayId':existing['gatewayId'],'host':value['host'],'port':value['port'],
+              'tls':value['tls'],'username':username or '','password':password or '','caPem':ca}
+    # Updating broker credentials must preserve the explicitly commissioned clock policy.
+    if 'time' in existing:
+        merged['time'] = dict(existing['time'])
+    return merged
 
 
 def atomic_write(path, payload):
@@ -184,7 +196,7 @@ class SetupStore:
         ca = str(self.ca_path) if value['caPem'] else None
         return (AgentSettings(value['gatewayId'], self.directory),
                 MqttSettings(value['host'], value['port'], value['tls'], ca,
-                             value['username'] or None, value['password'] or None))
+                             value['username'] or None, value['password'] or None, **time_settings(value)))
 
     @contextmanager
     def test_settings(self, value):
@@ -203,7 +215,7 @@ class SetupStore:
                 stream.write(value['caPem'].encode('ascii'))
             yield (AgentSettings(value['gatewayId'], self.directory),
                    MqttSettings(value['host'], value['port'], value['tls'], name,
-                                value['username'] or None, value['password'] or None))
+                                value['username'] or None, value['password'] or None, **time_settings(value)))
         finally:
             if os.path.exists(name):
                 os.unlink(name)

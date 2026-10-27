@@ -1,0 +1,139 @@
+{
+  "contract": "timeSyncV1/HUB-IOT-PLC-P0/2",
+  "scope": "Shared structural golden cases, not proof of synchronization or device execution",
+  "cases": [
+    {
+      "name": "request",
+      "kind": "timeRequest",
+      "valid": true,
+      "payload": {
+        "schemaVersion": 1,
+        "gatewayId": "PLC-01",
+        "requestId": "time-boot-A-1",
+        "bootId": "boot-A",
+        "sessionId": "session-A",
+        "clientMonoMs": 10000
+      }
+    },
+    {
+      "name": "response",
+      "kind": "timeResponse",
+      "valid": true,
+      "payload": {
+        "schemaVersion": 1,
+        "gatewayId": "PLC-01",
+        "requestId": "time-boot-A-1",
+        "bootId": "boot-A",
+        "sessionId": "session-A",
+        "clientMonoMs": 10000,
+        "serverReceivedAt": 1792739100000,
+        "serverSentAt": 1792739100005
+      }
+    },
+    {
+      "name": "extra_timestamp",
+      "kind": "timeRequest",
+      "valid": false,
+      "payload": {
+        "schemaVersion": 1,
+        "gatewayId": "PLC-01",
+        "requestId": "time-boot-A-1",
+        "bootId": "boot-A",
+        "sessionId": "session-A",
+        "clientMonoMs": 10000,
+        "timestamp": 0
+      }
+    },
+    {
+      "name": "bool_mono",
+      "kind": "timeRequest",
+      "valid": false,
+      "payload": {
+        "schemaVersion": 1,
+        "gatewayId": "PLC-01",
+        "requestId": "time-boot-A-1",
+        "bootId": "boot-A",
+        "sessionId": "session-A",
+        "clientMonoMs": true
+      }
+    },
+    {
+      "name": "float_mono",
+      "kind": "timeRequest",
+      "valid": false,
+      "payload": {
+        "schemaVersion": 1,
+        "gatewayId": "PLC-01",
+        "requestId": "time-boot-A-1",
+        "bootId": "boot-A",
+        "sessionId": "session-A",
+        "clientMonoMs": 10000.0
+      }
+    },
+    {
+      "name": "float_version",
+      "kind": "timeRequest",
+      "valid": false,
+      "payload": {
+        "schemaVersion": 1.0,
+        "gatewayId": "PLC-01",
+        "requestId": "time-boot-A-1",
+        "bootId": "boot-A",
+        "sessionId": "session-A",
+        "clientMonoMs": 10000
+      }
+    },
+    {
+      "name": "null_session",
+      "kind": "timeRequest",
+      "valid": false,
+      "payload": {
+        "schemaVersion": 1,
+        "gatewayId": "PLC-01",
+        "requestId": "time-boot-A-1",
+        "bootId": "boot-A",
+        "sessionId": null,
+        "clientMonoMs": 10000
+      }
+    },
+    {
+      "name": "unsafe_mono",
+      "kind": "timeRequest",
+      "valid": false,
+      "payload": {
+        "schemaVersion": 1,
+        "gatewayId": "PLC-01",
+        "requestId": "time-boot-A-1",
+        "bootId": "boot-A",
+        "sessionId": "session-A",
+        "clientMonoMs": 9007199254740992
+      }
+    },
+    {
+      "name": "long_id",
+      "kind": "timeRequest",
+      "valid": false,
+      "payload": {
+        "schemaVersion": 1,
+        "gatewayId": "PLC-01",
+        "requestId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "bootId": "boot-A",
+        "sessionId": "session-A",
+        "clientMonoMs": 10000
+      }
+    },
+    {
+      "name": "bad_id",
+      "kind": "timeRequest",
+      "valid": false,
+      "payload": {
+        "schemaVersion": 1,
+        "gatewayId": "PLC-01",
+        "requestId": "a/b",
+        "bootId": "boot-A",
+        "sessionId": "session-A",
+        "clientMonoMs": 10000
+      }
+    }
+  ]
+}

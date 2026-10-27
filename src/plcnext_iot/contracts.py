@@ -40,7 +40,7 @@ def _schema():
     return schema
 
 
-@lru_cache(maxsize=11)
+@lru_cache(maxsize=13)
 def _validator(kind: str) -> Draft202012Validator:
     # lru_cache alone permits concurrent first-load calls. Serialize the cache
     # lookup, not validation, so worker/MQTT threads load and check it once.
@@ -114,6 +114,12 @@ def validate_message(kind: str, payload: bytes, *,
 
 
 def _semantic_issues(kind: str, message: dict) -> list[Issue]:
+    if kind in ('timeRequest', 'timeResponse'):
+        fields = ['schemaVersion', 'clientMonoMs']
+        if kind == 'timeResponse':
+            fields += ['serverReceivedAt', 'serverSentAt']
+        return [Issue('SCHEMA_INVALID', '/' + key, 'Expected an integer token.')
+                for key in fields if type(message[key]) is not int]
     if kind == "configSet":
         return _config_issues(message["config"])
     if kind == "configPatch":

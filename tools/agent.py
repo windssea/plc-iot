@@ -27,8 +27,19 @@ async def run(settings, configs, run_seconds, driver='none', mqtt_settings=None,
     context = boot_context if boot_context is not None else ProcessBootContext(boot_id)
     if boot_id is not None and boot_id != context.boot_id:
         raise ValueError('Agent boot identity does not match its process context')
+    from plcnext_iot.core.platform_time import PlatformTime
+    mode=getattr(mqtt_settings,'time_mode','SYSTEM_RTC')
+    basis=getattr(mqtt_settings,'time_basis_ref',None)
+    if context.time_provider is None:
+        context.time_provider=PlatformTime(settings.gateway_id,context.boot_id,mode=mode,basis=basis,
+            drift_ppm=getattr(mqtt_settings,'drift_ppm',None),drift_evidence=getattr(mqtt_settings,'drift_evidence',None))
+    elif (context.time_provider.gateway,context.time_provider.mode,context.time_provider.basis,
+          context.time_provider.drift_ppm,context.time_provider.drift_evidence)!=(
+              settings.gateway_id,mode,basis,getattr(mqtt_settings,'drift_ppm',None) or 0,
+              getattr(mqtt_settings,'drift_evidence',None)):
+        raise ValueError('Time identity/source changes require explicit maintenance')
     from plcnext_iot.points.samples import SampleBuffer
-    samples = SampleBuffer(boot_context=context,gateway_id=settings.gateway_id)
+    samples = SampleBuffer(boot_context=context,gateway_id=settings.gateway_id,time_provider=context.time_provider)
     if driver == 'none':
         runtime = DeviceRuntime(boot_context=context)
     else:

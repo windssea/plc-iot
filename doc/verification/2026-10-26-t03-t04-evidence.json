@@ -1,0 +1,62 @@
+{
+  "date": "2026-10-26",
+  "scope": "T03/T04 implementation and isolated validation; T06/T07 not run",
+  "baseline": "HUB-IOT-PLC-P0/2; JOINT-PLAN/2",
+  "pythonTests": {
+    "passed": 176,
+    "failed": 0,
+    "log": ".local/t03-t04-verification/regression.log",
+    "modules": [
+      "test_phase1_events",
+      "test_phase1_collectors",
+      "test_phase1_outbox",
+      "test_phase1_accounting",
+      "tests.test_report_policy_clock",
+      "tests.test_runtime_health",
+      "tests.test_mqtt",
+      "tests.test_platform_time",
+      "tests.test_timed_outbox",
+      "tests.test_time_sync_contract",
+      "tests.test_contracts",
+      "tests.test_platform_mqtt",
+      "tests.test_time_settings"
+    ]
+  },
+  "existingSQLite": {
+    "database": "D:\\work\\code\\PLCnext-iot\\.local\\setup-preview\\telemetry.db",
+    "checks": [
+      "migration_rollback_preserves_v1",
+      "legacy_bytes_hash_attempts_counters_dead_and_unknown_age_preserved",
+      "new_boot_paced_retry_ignores_old_monotonic_deadline_and_ack_while_invalid",
+      "actual_sql_transaction_rolls_back_payload_order_and_clock_metadata",
+      "durable_time_boundary_age_terminal_and_late_stored_survive_reopen"
+    ],
+    "restored": true,
+    "agentDbUnchanged": true,
+    "originalBackupSha256": "65ff1263f4add740241688eab34f75f9fd309b1d88e43bbd29d6b92cdf987dbd"
+  },
+  "backend": {
+    "pid": 27204,
+    "port": 8080,
+    "instances": 1,
+    "restarted": false
+  },
+  "frontend": {
+    "pid": 35404,
+    "port": 8090,
+    "restarted": false
+  },
+  "temporaryDatabaseCreated": false,
+  "hubDatabaseMutatedByThisVerification": false,
+  "agentCollectionStarted": false,
+  "physicalPlcContacted": false,
+  "systemClockModified": false,
+  "P06Resumed": false,
+  "remaining": [
+    "T06 real Hub/Python data and receipts",
+    "evidenced deployment drift bound and suspend/resume matrix",
+    "T05 production Main/MQTT/capture/HMI wiring",
+    "T07 physical integration"
+  ],
+  "driftFixtureOnly": true
+}

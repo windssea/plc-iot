@@ -1,0 +1,150 @@
+{
+  "atUtc": "2026-10-26T13:22:26.359822+00:00",
+  "scope": "T06_CURRENT_BOOT_INDEPENDENT_COHORT_AND_RECONNECT_REAL_PASS",
+  "gatewayId": "PLC-UI-DEMO",
+  "cohort": {
+    "scope": "CURRENT_BOOT_SOURCE_POLICY_WIRE_ACK_LOCAL_RELEASE",
+    "bootId": "boot-88420ac8e87a43ec89d2e41bfcdca892",
+    "captured": 2436,
+    "eligible": 2436,
+    "filtered": 0,
+    "stored": 2096,
+    "knownUnsent": 340,
+    "timeInvalid": 340,
+    "batches": 37,
+    "missedReportSlots": 2,
+    "sessions": 2,
+    "sourcePrefixAndTailComplete": true,
+    "independentSelectionMatched": true,
+    "currentBootCohortComplete": true,
+    "globalAccountingComplete": false,
+    "priorVolatileRestartLoss": "UNKNOWN",
+    "oracleConfigFromHubRelease": true,
+    "databaseProofAttached": true,
+    "performanceAccepted": false,
+    "databaseProof": {
+      "scope": "CAPTURED_WINDOW_REAL_RECEIPTS_AND_SAMPLE_MULTISET",
+      "gatewayId": "PLC-UI-DEMO",
+      "bootIds": [
+        "boot-88420ac8e87a43ec89d2e41bfcdca892"
+      ],
+      "receiptHashesVerified": 37,
+      "committedSampleMultisetVerified": 2096,
+      "wireValues": 2096,
+      "distinctPoints": 250,
+      "timeRequestCount": 10,
+      "timeResponsesExactEchoVerified": 6,
+      "dataAfterObservedTimeResponses": false,
+      "normalizedTwoAgentConfigEqual": true,
+      "configDevices": 50,
+      "configPoints": 250,
+      "fullEventCohortComplete": false,
+      "nativeLocalReleaseAllProven": false,
+      "performanceAccepted": false,
+      "databaseWrites": false,
+      "temporaryDatabaseCreated": false,
+      "fakeDataOrAckPublished": false
+    },
+    "missedPollCycles": 314
+  },
+  "connections": 2,
+  "checks": [
+    {
+      "reconnected": true,
+      "sameBoot": "boot-88420ac8e87a43ec89d2e41bfcdca892",
+      "sequenceBefore": 936,
+      "sequenceAfter": 1186
+    },
+    {
+      "capturePrefixComplete": 2436,
+      "tailDrained": true
+    }
+  ],
+  "audit": {
+    "accepted": 5949,
+    "written": 5949,
+    "rejected": 0,
+    "accountingComplete": true
+  },
+  "coldProbe": {
+    "status": "FAIL_TAIL_WINDOW_20_SECONDS",
+    "failurePreserved": "Tail not drained; preserve existing DB and evidence",
+    "bootId": "boot-bf784a79f7eb43bf949226f7cf0bdecc",
+    "captured": 1682,
+    "pendingAtExit": 64,
+    "eventualDbProof": {
+      "scope": "CAPTURED_WINDOW_REAL_RECEIPTS_AND_SAMPLE_MULTISET",
+      "gatewayId": "PLC-UI-DEMO",
+      "bootIds": [
+        "boot-bf784a79f7eb43bf949226f7cf0bdecc"
+      ],
+      "receiptHashesVerified": 33,
+      "committedSampleMultisetVerified": 1682,
+      "wireValues": 1682,
+      "distinctPoints": 250,
+      "timeRequestCount": 5,
+      "timeResponsesExactEchoVerified": 3,
+      "dataAfterObservedTimeResponses": true,
+      "normalizedTwoAgentConfigEqual": true,
+      "configDevices": 50,
+      "configPoints": 250,
+      "fullEventCohortComplete": false,
+      "nativeLocalReleaseAllProven": false,
+      "performanceAccepted": false,
+      "databaseWrites": false,
+      "temporaryDatabaseCreated": false,
+      "fakeDataOrAckPublished": false
+    },
+    "fullCurrentBootCohortAccepted": false
+  },
+  "tailRecovery": {
+    "newBoot": "boot-996f9ff5dfdf4ca5b0f7f13592ae15ed",
+    "newCaptureEvents": 0,
+    "realRetryWireProof": {
+      "scope": "CAPTURED_WINDOW_REAL_RECEIPTS_AND_SAMPLE_MULTISET",
+      "gatewayId": "PLC-UI-DEMO",
+      "bootIds": [
+        "boot-bf784a79f7eb43bf949226f7cf0bdecc"
+      ],
+      "receiptHashesVerified": 1,
+      "committedSampleMultisetVerified": 64,
+      "wireValues": 64,
+      "distinctPoints": 64,
+      "timeRequestCount": 4,
+      "timeResponsesExactEchoVerified": 3,
+      "dataAfterObservedTimeResponses": true,
+      "normalizedTwoAgentConfigEqual": true,
+      "configDevices": 50,
+      "configPoints": 250,
+      "fullEventCohortComplete": false,
+      "nativeLocalReleaseAllProven": false,
+      "performanceAccepted": false,
+      "databaseWrites": false,
+      "temporaryDatabaseCreated": false,
+      "fakeDataOrAckPublished": false
+    },
+    "pendingAfter": 0
+  },
+  "originalExistingSqliteRestored": {
+    "agent": {
+      "originalDumpMatched": true,
+      "schemaVersion": 1,
+      "integrity": "ok"
+    },
+    "telemetry": {
+      "originalDumpMatched": true,
+      "schemaVersion": 1,
+      "integrity": "ok"
+    }
+  },
+  "commissioningUnchanged": true,
+  "temporaryDatabaseCreated": false,
+  "agentExited": true,
+  "sharedServicesStopped": false,
+  "operatingSystemClockChanged": false,
+  "productionAgentCodeChanged": false,
+  "pureOracleTestsPassed": 13,
+  "performanceAccepted": false,
+  "globalAccountingComplete": false,
+  "report": "D:\\work\\code\\PLCnext-Engineer\\docs\\三方联调-独立事件对账与Python重连-20261026.md"
+}

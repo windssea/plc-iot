@@ -9,7 +9,7 @@ from plcnext_iot.config.store import StoreError,StoreFormatError,StoreIdentityEr
 
 
 class Database:
-    def __init__(self,path,gateway,application_id,tables):
+    def __init__(self,path,gateway,application_id,tables,*,format_version=1,meta_extra=''):
         if not isinstance(gateway,str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}',gateway):
             raise ValueError('Invalid gateway')
         self.gateway=gateway
@@ -24,7 +24,7 @@ class Database:
             version=self.c.execute('PRAGMA user_version').fetchone()[0]
             names={r[0] for r in self.c.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             new=app==0 and version==0 and not names
-            if not new and (app!=application_id or version!=1 or names!=set(tables)|{'meta'}):
+            if not new and (app!=application_id or version!=format_version or names!=set(tables)|{'meta'}):
                 raise StoreFormatError('Unknown telemetry database format')
             if not new:
                 row=self.c.execute('SELECT gateway FROM meta WHERE id=1').fetchone()
@@ -36,12 +36,12 @@ class Database:
             self.c.execute('PRAGMA synchronous=FULL')
             with self.transaction():
                 if new:
-                    self.c.execute('CREATE TABLE meta(id INTEGER PRIMARY KEY CHECK(id=1),gateway TEXT NOT NULL,dropped INTEGER NOT NULL,dead_pruned INTEGER NOT NULL)')
-                    self.c.execute('INSERT INTO meta VALUES(1,?,0,0)',(gateway,))
+                    self.c.execute('CREATE TABLE meta(id INTEGER PRIMARY KEY CHECK(id=1),gateway TEXT NOT NULL,dropped INTEGER NOT NULL,dead_pruned INTEGER NOT NULL'+meta_extra+')')
+                    self.c.execute('INSERT INTO meta(id,gateway,dropped,dead_pruned) VALUES(1,?,0,0)',(gateway,))
                     for statement in tables.values():
                         self.c.execute(statement)
                     self.c.execute(f'PRAGMA application_id={application_id}')
-                    self.c.execute('PRAGMA user_version=1')
+                    self.c.execute(f'PRAGMA user_version={format_version}')
         except BaseException as exc:
             self.close()
             if isinstance(exc,sqlite3.Error):
@@ -49,10 +49,15 @@ class Database:
             raise
 
     @contextmanager
-    def transaction(self):
+    def transaction(self,commit_guard=None):
         try:
             self.c.execute('BEGIN IMMEDIATE')
             yield
+            # Admission linearizes here, before COMMIT/fsync. Later invalidation
+            # cannot revoke an already accepted historical event. No DB lock is
+            # held by the event-loop time provider while slow SQL is performed.
+            if commit_guard is not None:
+                commit_guard()
             self.c.execute('COMMIT')
         except BaseException as exc:
             if self.c.in_transaction:

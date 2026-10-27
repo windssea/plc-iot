@@ -35,6 +35,12 @@
     },
     {
       "$ref": "#/$defs/configPatchAck"
+    },
+    {
+      "$ref": "#/$defs/timeRequest"
+    },
+    {
+      "$ref": "#/$defs/timeResponse"
     }
   ],
   "$defs": {
@@ -1867,6 +1873,88 @@
           }
         }
       ]
+    },
+    "timeRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "gatewayId",
+        "requestId",
+        "bootId",
+        "sessionId",
+        "clientMonoMs"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "type": "integer",
+          "const": 1
+        },
+        "gatewayId": {
+          "$ref": "#/$defs/id"
+        },
+        "requestId": {
+          "$ref": "#/$defs/id"
+        },
+        "bootId": {
+          "$ref": "#/$defs/id"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/id"
+        },
+        "clientMonoMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "timeResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "gatewayId",
+        "requestId",
+        "bootId",
+        "sessionId",
+        "clientMonoMs",
+        "serverReceivedAt",
+        "serverSentAt"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "type": "integer",
+          "const": 1
+        },
+        "gatewayId": {
+          "$ref": "#/$defs/id"
+        },
+        "requestId": {
+          "$ref": "#/$defs/id"
+        },
+        "bootId": {
+          "$ref": "#/$defs/id"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/id"
+        },
+        "clientMonoMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "serverReceivedAt": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "serverSentAt": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
     }
   }
 }

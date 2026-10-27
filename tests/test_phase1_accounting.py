@@ -97,7 +97,8 @@ class AccountingTests(unittest.TestCase):
 
     def test_late_stored_changes_gauge_but_keeps_historical_uncertain(self):
         self.admit();key=self.commit();self.store.reserve(0)
-        self.clock.now=30;self.store._expire(7*86400)
+        # Inject the terminal decision; trusted-age boundaries live in test_timed_outbox.
+        self.clock.now=30;self.store._terminal(key,'EXPIRED_DATA','AGE_EXPIRED')
         s=self.accounting.snapshot()
         self.assertEqual((s['buffer']['pendingEvents'],s['buffer']['deadEvents']),(0,1))
         self.assertEqual(s['counters']['uncertainDeliveryEventsTotal'],1)

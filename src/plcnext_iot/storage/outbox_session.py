@@ -83,6 +83,9 @@ class OutboxSession:
             self.staged.pop(key)
             entry.due = self.clock()+(60 if row['attempts'] else 0)
             entry.ever_sent = row['attempts']>0
+            # Only v2 has an explicit, durable terminal source. Legacy DEAD remains unknown.
+            if row.get('terminal_source') in ('AGE_EXPIRED','PERMANENT_REJECT'):
+                entry.source=row['terminal_source']
             self.entries[key] = entry
             self.accounting_complete = False
             if self.accounting is not None:self.accounting.restored(entry)

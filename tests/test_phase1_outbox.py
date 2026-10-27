@@ -9,6 +9,7 @@ from pathlib import Path
 import threading
 import time
 import tracemalloc
+import uuid
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -24,7 +25,7 @@ from plcnext_iot.storage.batch_repository import SqlBatches
 
 ROOT=Path(__file__).resolve().parents[1]
 MEASUREMENTS=[]
-EVIDENCE_OUTPUT=ROOT/'doc/verification/evidence/2026-10-24-i03-i04'
+EVIDENCE_OUTPUT=ROOT/'.local/t03-t04-regression-evidence'/uuid.uuid4().hex
 
 
 class Clock:
@@ -206,13 +207,15 @@ class OutboxPolicyTests(unittest.TestCase):
         self.add('b1');self.sent()
         # Even a far-future wall value does not expire an active ACK wait.
         self.store._expire(7*86400);self.assertEqual(self.store.stats()['pending'],1)
-        self.clock.now=30;self.store._expire(7*86400)
+        # Terminal accounting fixture. Trusted age selection is independently
+        # exercised by test_timed_outbox; a legacy wall value is no longer proof.
+        self.clock.now=30;self.store._terminal('b1','EXPIRED_DATA','AGE_EXPIRED')
         self.assertEqual(self.session.facts['uncertain'],1)
         self.assertTrue(self.store.acknowledge(ack('b1')))
         self.assertEqual((self.session.facts['uncertain'],self.session.facts['stored'],self.session.facts['late_stored']),(1,1,1))
 
     def test_unsent_expiry_known_unsent_and_unknown_ack_no_reconstruction(self):
-        self.add('b1');self.store._expire(7*86400)
+        self.add('b1');self.store._terminal('b1','EXPIRED_DATA','AGE_EXPIRED')
         self.assertEqual(self.session.facts['known_unsent'],1)
         self.assertFalse(self.store.acknowledge(ack('b1')))
 
@@ -243,7 +246,7 @@ class OutboxPolicyTests(unittest.TestCase):
         self.assertNotIn('b1',self.session.entries)
 
     def test_legacy_dead_without_source_does_not_invent_late_stored(self):
-        self.add('b1');self.sent();self.clock.now=30;self.store._expire(7*86400)
+        self.add('b1');self.sent();self.clock.now=30;self.store._terminal('b1','EXPIRED_DATA','AGE_EXPIRED')
         fresh=OutboxSession(clock=self.clock)
         store=OutboxStore(None,'PLC-01',repository=self.repo,session=fresh)
         self.assertFalse(store.acknowledge(ack('b1')))
@@ -253,7 +256,7 @@ class OutboxPolicyTests(unittest.TestCase):
         self.add('b1');self.sent();self.store.submission_failed('b1')
         self.assertEqual(self.session.entries['b1'].due,30)
         self.assertIsNone(self.sent())
-        self.clock.now=30;self.store._expire(7*86400)
+        self.clock.now=30;self.store._terminal('b1','EXPIRED_DATA','AGE_EXPIRED')
         self.assertEqual((self.session.facts['known_unsent'],self.session.facts['uncertain']),(1,0))
 
     def test_wrong_gateway_unsent_unknown_and_invalid_ack_are_noops(self):
@@ -304,7 +307,9 @@ class OutboxPolicyTests(unittest.TestCase):
         self.session.entries['p'].due=100
         self.session.entries['l'].due=100
         self.clock.now=.25;self.assertEqual(json.loads(self.sent(wall=-7*86400))['messageId'],'u')
-        self.clock.now=31;self.store._expire(0)
+        self.clock.now=31
+        self.store._terminal('l','EXPIRED_DATA','AGE_EXPIRED')
+        self.store._terminal('u','EXPIRED_DATA','AGE_EXPIRED')
         g1=oracle.partition((1,2,3,4),stored=(1,),pending=(2,),lost=(3,),uncertain=(4,))
         self.assertEqual(g1,dict(S=1,P=1,L=1,I=0,U=1))
         self.assertEqual([self.session.facts[k] for k in ('stored','known_unsent','uncertain')],[1,1,1])

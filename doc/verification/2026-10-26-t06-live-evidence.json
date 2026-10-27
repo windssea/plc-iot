@@ -1,0 +1,143 @@
+{
+  "scope": "T06_PARTIAL_REAL_FUNCTIONAL_PASS_FULL_MATRIX_IN_PROGRESS",
+  "gatewayId": "PLC-UI-DEMO",
+  "parentId": "2114654899351924737",
+  "configVersion": 1,
+  "devices": 50,
+  "points": 250,
+  "wrongDiagnosticSystemDate": "2000-01-01",
+  "operatingSystemClockChanged": false,
+  "phase1": {
+    "bootId": "boot-0d452f5f1fc34cce9b2c02ab3bcb4f54",
+    "captureEvents": 2178,
+    "eligibleEvents": 2178,
+    "storedConfirmedEvents": 2178,
+    "pending": 0,
+    "dead": 0,
+    "missedPollCycles": 322,
+    "missedReportSlots": 322,
+    "accountingComplete": false
+  },
+  "restart": {
+    "intentionalExitCode": 86,
+    "noSharedServiceStopped": true,
+    "collectorsHeld": true,
+    "newCaptureEvents": 0,
+    "recoveryBootId": "boot-931ecf8f30c44c15a9de095a371972a5",
+    "receiptEvidence": {
+      "scope": "REAL_HUB_COMMITTED_RECEIPTS_READ_ONLY",
+      "gatewayId": "PLC-UI-DEMO",
+      "receipts": {
+        "batch-576694df2dbc412481fd7c2568544ced": "15d282455879120b22fe3777d0a0ad2393131e6033ea86a97e780273b72684f1",
+        "batch-ee77e9a6f37541fbb40464c07315b4bb": "2638c25792baa007b4ca491d1548552eb316c30c9d96cb57589b27f5cbe279ba"
+      },
+      "bothExactHashesMatched": true,
+      "recoveryBootId": "boot-931ecf8f30c44c15a9de095a371972a5",
+      "crashedBootId": "boot-0b721cc48b624a2c8aa4fb9874d633a4",
+      "noNewCapture": true,
+      "pendingAfter": 0,
+      "fakeAckPublished": false,
+      "temporaryDatabaseCreated": false,
+      "limitation": "No independent wire observer covered recovery retransmission; SDK/SQLite marker, production hash-verified ACK removal and committed Hub receipt are linked. Full event cohort remains incomplete."
+    },
+    "pendingObservations": [
+      {
+        "monoMs": 465384953,
+        "pending": 2
+      },
+      {
+        "monoMs": 465389968,
+        "pending": 1
+      },
+      {
+        "monoMs": 465394953,
+        "pending": 1
+      },
+      {
+        "monoMs": 465399968,
+        "pending": 1
+      },
+      {
+        "monoMs": 465404953,
+        "pending": 1
+      },
+      {
+        "monoMs": 465409968,
+        "pending": 1
+      },
+      {
+        "monoMs": 465414968,
+        "pending": 1
+      },
+      {
+        "monoMs": 465419953,
+        "pending": 1
+      },
+      {
+        "monoMs": 465424953,
+        "pending": 1
+      },
+      {
+        "monoMs": 465429953,
+        "pending": 1
+      },
+      {
+        "monoMs": 465434953,
+        "pending": 1
+      },
+      {
+        "monoMs": 465439953,
+        "pending": 1
+      },
+      {
+        "monoMs": 465444953,
+        "pending": 0
+      },
+      {
+        "monoMs": 465449968,
+        "pending": 0
+      },
+      {
+        "monoMs": 465454968,
+        "pending": 0
+      },
+      {
+        "monoMs": 465459968,
+        "pending": 0
+      },
+      {
+        "monoMs": 465464953,
+        "pending": 0
+      }
+    ]
+  },
+  "existingSqliteOriginalRestored": {
+    "agent": {
+      "restored": true,
+      "integrity": "ok"
+    },
+    "telemetry": {
+      "restored": true,
+      "integrity": "ok"
+    }
+  },
+  "temporaryDatabaseCreated": false,
+  "backendInstances": 1,
+  "frontend": {
+    "realBrowserChecked": true,
+    "version1Applied": true,
+    "childButtons": 50,
+    "batchIntervalMs": 1000,
+    "maxBatchPoints": 64,
+    "agentOfflineAfterTestExpected": true,
+    "screenshot": "../../../PLCnext-Hub-Backend/logs/joint-timesync/python-frontend-config.png"
+  },
+  "limitations": [
+    "Independent recovery wire observer missed the retransmit window",
+    "VOLATILE_RESTART unknown retained",
+    "322 startup/config poll/report misses retained",
+    "No physical power loss, seven-day wait, production drift certification or full R01-R14 matrix",
+    "driver=none probe failed startup as designed; corrected driver+held-collectors trial passed"
+  ],
+  "rawEvidence": ".local/joint-time-live-20261026"
+}

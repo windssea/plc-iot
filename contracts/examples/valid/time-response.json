@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "gatewayId": "PLC-01",
+  "requestId": "time-boot-A-1",
+  "bootId": "boot-A",
+  "sessionId": "session-A",
+  "clientMonoMs": 10000,
+  "serverReceivedAt": 1792739100000,
+  "serverSentAt": 1792739100005
+}

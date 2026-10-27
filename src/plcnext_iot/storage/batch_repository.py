@@ -1,4 +1,4 @@
-"""Version-1 SQL adapter. Policy accepts a repository for no-database tests."""
+"""Version-2 SQL adapter. Policy accepts a repository for no-database tests."""
 import shutil
 from pathlib import Path
 
@@ -38,9 +38,25 @@ class SqlBatches:
             raise StoreError('Telemetry WAL cannot be bounded while a reader holds it')
 
     def rows(self):
-        for row in self.db.c.execute('''SELECT rowid AS local_order,message_id,hash,created,attempts,
-            next_due,state,reason,length(payload) AS size FROM batches ORDER BY rowid'''):
+        for row in self.db.c.execute('''SELECT local_order,message_id,hash,created,attempts,
+            next_due,state,reason,length(payload) AS size,enqueued_utc_ms,uncertainty_ms,time_trust,
+            time_basis_ref,enqueue_boot_id,clock_revision,terminal_source FROM batches ORDER BY local_order'''):
             yield dict(row)
+
+    def next_order(self):
+        return self.db.c.execute('SELECT next_order FROM meta WHERE id=1').fetchone()[0]
+
+    def time_boundary(self):
+        return self.db.c.execute('SELECT trusted_basis_ref,trusted_utc_high_water_ms FROM meta WHERE id=1').fetchone()
+
+    def _remember_time(self,row):
+        if row.get('time_trust') == 'HUB_TRUSTED':
+            old_basis, old_floor = self.time_boundary()
+            if old_basis is not None and old_basis != row['time_basis_ref']:
+                raise StoreError('Outbox time basis requires explicit maintenance')
+            floor = max(0,row['enqueued_utc_ms']-row['uncertainty_ms'])
+            self.db.c.execute('UPDATE meta SET trusted_basis_ref=?,trusted_utc_high_water_ms=? WHERE id=1',
+                             (row['time_basis_ref'],max(floor,old_floor or 0)))
 
     def payload(self, message_id):
         row = self.db.c.execute('SELECT payload FROM batches WHERE message_id=?',(message_id,)).fetchone()
@@ -48,15 +64,26 @@ class SqlBatches:
 
     def insert(self, row, payload):
         self.guard()
-        with self.db.transaction():
-            self.db.c.execute("INSERT INTO batches(message_id,payload,hash,created,state) VALUES(?,?,?,?,'PENDING')",
-                (row['message_id'],payload,row['hash'],row['created']))
+        guard=getattr(self.db,'_commit_guard',None)
+        def accepted():
+            current=guard() if guard is not None else None
+            if current is not None and row.get('time_trust')=='HUB_TRUSTED':
+                row.update(enqueued_utc_ms=current.utc_ms,uncertainty_ms=current.uncertainty_ms)
+                self.db.c.execute('UPDATE batches SET enqueued_utc_ms=?,uncertainty_ms=? WHERE message_id=?',
+                                 (current.utc_ms,current.uncertainty_ms,row['message_id']))
+                self._remember_time(row)
+        with self.db.transaction(commit_guard=accepted):
+            self.db.c.execute("INSERT INTO batches(message_id,payload,hash,created,state,local_order,enqueued_utc_ms,uncertainty_ms,time_trust,time_basis_ref,enqueue_boot_id,clock_revision) VALUES(?,?,?,?,'PENDING',?,?,?,?,?,?,?)",
+                (row['message_id'],payload,row['hash'],row['created'],row['local_order'],row.get('enqueued_utc_ms'),
+                 row.get('uncertainty_ms'),row.get('time_trust','LEGACY_UNVERIFIED'),row.get('time_basis_ref'),
+                 row.get('enqueue_boot_id'),row.get('clock_revision')))
+            self.db.c.execute('UPDATE meta SET next_order=? WHERE id=1',(row['local_order']+1,))
 
     def update(self, message_id, **fields):
         if not set(fields) <= {'attempts','next_due','state','reason'}:
             raise ValueError('Unsupported batch mutation')
         self.guard()
-        with self.db.transaction():
+        with self.db.transaction(commit_guard=getattr(self.db,'_commit_guard',None)):
             self.db.c.execute('UPDATE batches SET '+','.join(k+'=?' for k in fields)+' WHERE message_id=?',
                               (*fields.values(),message_id))
 
@@ -72,9 +99,12 @@ class SqlBatches:
             self.db.c.execute('UPDATE meta SET dead_pruned=min(dead_pruned+1,9007199254740991) WHERE id=1')
 
     def terminal(self, message_id, reason, pruned):
+        return self.terminal_with_source(message_id,reason,pruned,None)
+
+    def terminal_with_source(self, message_id, reason, pruned, source):
         self.guard()
-        with self.db.transaction():
-            self.db.c.execute("UPDATE batches SET state='DEAD',reason=? WHERE message_id=?",(reason,message_id))
+        with self.db.transaction(commit_guard=getattr(self.db,'_commit_guard',None)):
+            self.db.c.execute("UPDATE batches SET state='DEAD',reason=?,terminal_source=? WHERE message_id=?",(reason,source,message_id))
             for key in pruned:
                 self.db.c.execute('DELETE FROM batches WHERE message_id=?',(key,))
             if pruned:

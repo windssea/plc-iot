@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import queue
 import ssl
 import threading
+import time
 
 import paho.mqtt.client as mqtt
 
@@ -13,6 +14,7 @@ class Incoming:
     topic: str
     payload: bytes
     retained: bool
+    received_mono_ms: int | None = None
 
 
 class PublishRejected(ConnectionError):
@@ -29,12 +31,15 @@ async def _thread(function, *args):
 
 
 class PahoConnection:
-    def __init__(self, settings, client_id, subscriptions, *, will=None):
+    def __init__(self, settings, client_id, subscriptions, *, will=None,mono_ms=None):
         self.settings, self.client_id = settings, client_id
         self.subscriptions = tuple(subscriptions)
         self.will = will
         self._client = None
         self._incoming = queue.Queue(maxsize=8)
+        self._time_incoming = queue.Queue(maxsize=4)
+        self._mono_ms=mono_ms or (lambda:time.monotonic_ns()//1_000_000)
+        self._prefer_time=True
         self._ready = threading.Event()
         self._lost = threading.Event()
         self._error = None
@@ -66,11 +71,14 @@ class PahoConnection:
         self._lost.set()
 
     def _on_message(self, _client, _userdata, message):
-        if message.topic not in self.subscriptions or len(message.payload) > 2 * 1024 * 1024:
+        received=self._mono_ms()
+        timing=message.topic.endswith('/time/response')
+        if message.topic not in self.subscriptions or len(message.payload) > (2048 if timing else 2 * 1024 * 1024):
             self.dropped += 1
             return
         try:
-            self._incoming.put_nowait(Incoming(message.topic,message.payload,bool(message.retain)))
+            target=self._time_incoming if timing else self._incoming
+            target.put_nowait(Incoming(message.topic,message.payload,bool(message.retain),received))
         except queue.Full:
             self.dropped += 1
 
@@ -116,10 +124,15 @@ class PahoConnection:
         while True:
             if not self.connected:
                 raise ConnectionError('MQTT disconnected')
-            try:
-                return self._incoming.get_nowait()
-            except queue.Empty:
-                await asyncio.sleep(0.02)
+            queues=(self._time_incoming,self._incoming) if self._prefer_time else (self._incoming,self._time_incoming)
+            for target in queues:
+                try:
+                    result=target.get_nowait()
+                    self._prefer_time=target is not self._time_incoming
+                    return result
+                except queue.Empty:
+                    pass
+            await asyncio.sleep(0.02)
 
     async def publish(self, topic, payload, *, retain=False):
         info=self.submit_publish(topic,payload,retain=retain)
@@ -156,3 +169,6 @@ class PahoConnection:
                 self._incoming.get_nowait()
             except queue.Empty:
                 break
+        while not self._time_incoming.empty():
+            try:self._time_incoming.get_nowait()
+            except queue.Empty:break
