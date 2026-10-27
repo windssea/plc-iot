@@ -341,8 +341,9 @@
       "sha256": "bbc2a580070781438fe226b2cc98b73317b92a8d9a60adedb4c49adae630df2f"
     },
     {
-      "path": "D:\\work\\code\\PLCnext-Engineer\\projects\\catalog.json",
-      "sha256": "7ad39a07bd57dccc0cd98d4bb8687fafe6b9a91d3324f1d986bb0aa1d25d0b1b"
+      "path": "D:\\work\\code\\PLCnext-Engineer\\docs\\verification\\artifacts\\project-catalog-entry-20261027.json",
+      "sha256": "7ad39a07bd57dccc0cd98d4bb8687fafe6b9a91d3324f1d986bb0aa1d25d0b1b",
+      "originalMutableSourcePath": "D:\\work\\code\\PLCnext-Engineer\\projects\\catalog.json"
     },
     {
       "path": "D:\\work\\code\\PLCnext-Engineer\\NativeGateway.pcwex",
@@ -396,5 +397,6 @@
     "existingLiveSqliteRestored": true,
     "correctedEntry": "tools/run_startup_regression.py",
     "correctedEntryRejectsAllSqliteConnections": true
-  }
+  },
+  "historicalCatalogSnapshotNote": "Audit-v2 adds a separate candidate; the pre-audit catalog is preserved byte-for-byte here. All prior hashes and runtime conclusions are unchanged."
 }
