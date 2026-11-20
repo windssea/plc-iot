@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PLC child-device IoT wire protocol v2 (capability-negotiated extension)",
+  "$comment": "Activated only when both Gateway and Hub negotiate v2 capability tokens. Legacy v1 gateways remain on contracts/v1/protocol.schema.json.",
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "safeNonNegativeInt": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "safePositiveInt": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "timeQuality": {
+      "type": "string",
+      "enum": ["SYNCED", "HOLDING", "UNSYNCED", "STEPPED"]
+    },
+    "capabilityToken": {
+      "type": "string",
+      "enum": [
+        "devicePatchV1",
+        "stateRevisionV2",
+        "heartbeatRevisionV2",
+        "collectionEpochV2",
+        "stateEventAckV2",
+        "sourceSampleSeqV2",
+        "clockRevisionV2"
+      ]
+    },
+    "heartbeatV2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "gatewayId",
+        "sessionId",
+        "timestamp",
+        "agentState",
+        "activeConfigVersion",
+        "heartbeatRevision",
+        "clockRevision",
+        "timeQuality"
+      ],
+      "properties": {
+        "schemaVersion": { "const": 2 },
+        "gatewayId": { "$ref": "#/$defs/id" },
+        "sessionId": { "$ref": "#/$defs/id" },
+        "timestamp": { "$ref": "#/$defs/safeNonNegativeInt" },
+        "agentVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "agentState": { "enum": ["RUNNING", "DISABLED", "WAITING_CONFIG", "FAULT"] },
+        "activeConfigVersion": { "$ref": "#/$defs/safeNonNegativeInt" },
+        "heartbeatRevision": { "$ref": "#/$defs/safePositiveInt" },
+        "clockRevision": { "$ref": "#/$defs/safeNonNegativeInt" },
+        "timeQuality": { "$ref": "#/$defs/timeQuality" },
+        "capabilities": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/capabilityToken" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "deviceStatusV2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "gatewayId",
+        "sessionId",
+        "configVersion",
+        "timestamp",
+        "device"
+      ],
+      "properties": {
+        "schemaVersion": { "const": 2 },
+        "gatewayId": { "$ref": "#/$defs/id" },
+        "sessionId": { "$ref": "#/$defs/id" },
+        "configVersion": { "$ref": "#/$defs/safePositiveInt" },
+        "timestamp": { "$ref": "#/$defs/safeNonNegativeInt" },
+        "clockRevision": { "$ref": "#/$defs/safeNonNegativeInt" },
+        "timeQuality": { "$ref": "#/$defs/timeQuality" },
+        "stateEventId": { "$ref": "#/$defs/id" },
+        "device": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["deviceId", "status", "stateRevision"],
+          "properties": {
+            "deviceId": { "$ref": "#/$defs/id" },
+            "status": { "enum": ["ONLINE", "DEGRADED", "OFFLINE", "CONNECTING", "DISABLED"] },
+            "stateRevision": { "$ref": "#/$defs/safePositiveInt" },
+            "collectionEpoch": { "$ref": "#/$defs/safeNonNegativeInt" },
+            "lastError": { "type": ["string", "null"], "maxLength": 256 },
+            "lastGoodTimestamp": { "type": ["integer", "null"], "minimum": 0, "maximum": 9007199254740991 }
+          }
+        }
+      }
+    },
+    "stateEventAckV2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "gatewayId", "stateEventId", "deviceId", "stateRevision", "status", "timestamp"],
+      "properties": {
+        "schemaVersion": { "const": 2 },
+        "gatewayId": { "$ref": "#/$defs/id" },
+        "stateEventId": { "$ref": "#/$defs/id" },
+        "deviceId": { "$ref": "#/$defs/id" },
+        "stateRevision": { "$ref": "#/$defs/safePositiveInt" },
+        "status": { "enum": ["STORED", "DUPLICATE", "REJECTED"] },
+        "timestamp": { "$ref": "#/$defs/safeNonNegativeInt" }
+      }
+    },
+    "dataV2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "gatewayId",
+        "messageId",
+        "bootId",
+        "sequence",
+        "configVersion",
+        "timestamp",
+        "values"
+      ],
+      "properties": {
+        "schemaVersion": { "const": 2 },
+        "gatewayId": { "$ref": "#/$defs/id" },
+        "messageId": { "$ref": "#/$defs/id" },
+        "bootId": { "$ref": "#/$defs/id" },
+        "sequence": { "$ref": "#/$defs/safePositiveInt" },
+        "configVersion": { "$ref": "#/$defs/safePositiveInt" },
+        "timestamp": { "$ref": "#/$defs/safeNonNegativeInt" },
+        "clockRevision": { "$ref": "#/$defs/safeNonNegativeInt" },
+        "timeQuality": { "$ref": "#/$defs/timeQuality" },
+        "values": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "deviceId",
+              "pointId",
+              "quality",
+              "timestamp",
+              "collectionEpoch",
+              "sourceSampleSequence",
+              "sampleId"
+            ],
+            "properties": {
+              "deviceId": { "$ref": "#/$defs/id" },
+              "pointId": { "$ref": "#/$defs/id" },
+              "value": { "type": ["number", "boolean", "null"] },
+              "quality": { "type": "string", "minLength": 1, "maxLength": 32 },
+              "timestamp": { "$ref": "#/$defs/safeNonNegativeInt" },
+              "collectionEpoch": { "$ref": "#/$defs/safeNonNegativeInt" },
+              "sourceSampleSequence": { "$ref": "#/$defs/safePositiveInt" },
+              "sampleId": { "$ref": "#/$defs/id" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

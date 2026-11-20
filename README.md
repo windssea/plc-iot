@@ -1,5 +1,7 @@
 # PLCnext IoT 子设备采集
 
+跨项目协作入口：[六项目开发分工与全链路联调手册](../PLCnext-Hub-Backend/docs/architecture/six-project-integration-guide.md)。
+
 > 最新联调（2026-10-27）：Python端点连接复用修复通过376项隔离回归，真实启动/同进程重连2250事件完整入库释放、42收据/2250行一致，漏轮询/报告均0；与既有PLC证据的1532共同物理槽一致。历史314缺口保留，整体验收及P06仍未放行。既有SQLite已恢复，唯一后端和mock保持，本轮未操作PLC。见[修复报告](doc/verification/2026-10-27-project-entry-python-startup.md)与[工程下载入口](../PLCnext-Engineer/projects/README.md)。
 
 本轮禁止新建数据库的回归入口：`python tools/run_startup_regression.py`（55项，SQLite连接守卫）。全量`unittest discover`含自建临时SQLite夹具，本轮不再使用；此前误运行的执行偏差见[修复报告](doc/verification/2026-10-27-project-entry-python-startup.md)。

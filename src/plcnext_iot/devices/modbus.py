@@ -2,6 +2,7 @@
 import asyncio
 
 from plcnext_iot.drivers.modbus import ModbusReader, ReadError
+from plcnext_iot.messaging.v2_protocol import backoff_with_jitter
 from plcnext_iot.points.read_plan import plan_reads
 from plcnext_iot.points.events import PointEvents
 from plcnext_iot.points.slots import skipped_after
@@ -62,7 +63,7 @@ class ModbusRunner:
     async def _poll(self):
         loop = asyncio.get_running_loop()
         blocks, deadlines, active = (), [], None
-        reconnect_at, backoff = 0, 0.5
+        reconnect_at, backoff, fail_attempts = 0, 0.5, 0
         connection = self.device.connection
         endpoint = (connection.host.lower(), connection.port)
         monitor = asyncio.create_task(self._states(), name='modbus-states:' + self.device.device_id)
@@ -109,10 +110,17 @@ class ModbusRunner:
                         transport = next((q for q in errors if q in ('BAD_CONNECTION', 'BAD_TIMEOUT')), None)
                         self.last_error = transport or next(iter(errors), None)
                         if transport and attempted:
-                            reconnect_at = loop.time() + backoff
+                            delay = backoff_with_jitter(
+                                fail_attempts,
+                                base_s=0.5,
+                                cap_s=30.0,
+                                device_key=self.device.device_id,
+                            )
+                            reconnect_at = loop.time() + delay
+                            fail_attempts += 1
                             backoff = min(backoff * 2, 30)
                         elif not errors:
-                            backoff, reconnect_at = 0.5, 0
+                            backoff, reconnect_at, fail_attempts = 0.5, 0, 0
                         current = self.runtime.sample_context(self.device.device_id, self)
                         captured = loop.time()
                         for point in block.points:
