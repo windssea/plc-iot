@@ -201,6 +201,7 @@ class OutboxStore(Database):
         for e in entries:
             if e.active and mono>=e.due:
                 e.active=False
+        session.demote_stalled_new(mono)
         active=[e for e in entries if e.active]
         if len(active)>=8:
             return None
@@ -240,7 +241,7 @@ class OutboxStore(Database):
         mono=session.clock()
         e.row['attempts']=attempts
         e.previous_sent=e.ever_sent
-        e.due=mono+(30 if attempts==1 else 60);e.active=True;e.ever_sent=True
+        e.due=mono+(30 if attempts==1 else 60);e.active=True;e.ever_sent=True;e.last_sent_mono=mono
         session.next_send=mono+0.25;session.rate.append((mono,len(payload)))
         session.prefer_new=category!='new'
         session.emit('reserved',key,e,attempt=attempts,category=category)

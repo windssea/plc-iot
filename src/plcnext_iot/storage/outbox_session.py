@@ -20,6 +20,8 @@ class BatchState:
     capture_boot: str | None = None
     ever_sent: bool = False
     previous_sent: bool = False
+    enqueued_mono: float = 0.0
+    last_sent_mono: float = 0.0
 
 
 class OutboxSession:
@@ -61,7 +63,7 @@ class OutboxSession:
         old = self.entries.get(message_id) or self.staged.get(message_id)
         if old is not None:
             return old
-        entry = BatchState(row, category, events=array('Q',events), capture_boot=capture_boot)
+        entry = BatchState(row, category, events=array('Q',events), capture_boot=capture_boot, enqueued_mono=self.clock())
         if len(self.entries)+len(self.staged)>=self.max_records or self.used_bytes+self.charge(entry)>self.max_bytes:
             return None
         self.staged[message_id] = entry
@@ -98,6 +100,32 @@ class OutboxSession:
         self.watermark = watermark
         for entry in (*self.entries.values(),*self.staged.values()):
             entry.category = 'history'
+
+    def demote_stalled_new(self, mono, stall_seconds=8.0):
+        """Demote aged live batches to history when Hub stops ACKing while MQTT stays up."""
+        pending_new = [e for e in self.entries.values() if e.row['state'] == 'PENDING' and e.category == 'new']
+        if not pending_new:
+            return
+        stalled_sent = any(
+            e.ever_sent and (e.row['attempts'] >= 2 or (mono - e.last_sent_mono >= stall_seconds))
+            for e in pending_new
+        )
+        if not stalled_sent:
+            return
+        aged_unsent = any(not e.active and (mono - e.enqueued_mono >= stall_seconds) for e in pending_new)
+        if not aged_unsent:
+            return
+        active_hist = sum(
+            1 for e in self.entries.values()
+            if e.row['state'] == 'PENDING' and e.active and e.category == 'history'
+        )
+        for e in sorted(pending_new, key=lambda x: x.row['local_order']):
+            if e.active:
+                if active_hist < 7 and (e.row['attempts'] >= 2 or (mono - e.last_sent_mono >= stall_seconds)):
+                    e.category = 'history'
+                    active_hist += 1
+            elif mono - e.enqueued_mono >= stall_seconds:
+                e.category = 'history'
 
     def emit(self, kind, key, entry, **extra):
         if self.accounting is not None and kind in ('reserved','sdk_rejected','retryable_reject','conflict'):

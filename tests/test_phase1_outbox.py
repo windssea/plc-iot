@@ -149,6 +149,32 @@ class OutboxPolicyTests(unittest.TestCase):
         self.clock.now=2.5
         self.assertEqual(json.loads(self.sent())['messageId'],'h7')
 
+    def test_ack_stall_while_mqtt_up_demotes_aged_new_and_prioritizes_fresh_live(self):
+        # Hub stops ACKing while MQTT stays connected (no open_gate call).
+        for i in range(10):
+            self.clock.now=i*.25
+            self.add('s'+str(i),i+1)
+        for i in range(7):
+            self.clock.now=2+i*.25
+            self.assertEqual(json.loads(self.sent())['messageId'],'s'+str(i))
+        # Before 8s stall threshold, 8th slot stays reserved (7 active 'new').
+        self.clock.now=5
+        self.assertIsNone(self.sent())
+        # Past 8s stall threshold, fresh live batch arrives after Hub recovers.
+        self.clock.now=12
+        self.add('live1',11)
+        self.assertEqual(json.loads(self.sent())['messageId'],'live1')
+        # Stalled active batches and aged unsent batches were demoted to history, never dropped.
+        for i in range(10):
+            self.assertEqual(self.session.entries['s'+str(i)].category,'history')
+        self.assertEqual(self.session.entries['live1'].category,'new')
+        self.assertEqual(self.store.stats()['pending'],11)
+        # Once live1 is ACKed, next fresh live batch immediately uses the reserved slot.
+        self.assertTrue(self.store.acknowledge(ack('live1')))
+        self.clock.now=12.5
+        self.add('live2',12)
+        self.assertEqual(json.loads(self.sent())['messageId'],'live2')
+
     def test_eight_restored_active_slots_new_progresses_after_first_release(self):
         for i in range(8):
             self.add('h'+str(i),i+1)
