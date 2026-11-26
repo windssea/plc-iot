@@ -55,6 +55,8 @@ class ConnectionConfig:
     security_mode: str | None = None
     username: str | None = None
     password_env: str | None = None
+    max_read_registers: int | None = None
+    max_register_gap: int | None = None
 
 
 @dataclass(frozen=True)
@@ -104,7 +106,9 @@ def _connection(c, protocol):
         return ConnectionConfig(c["host"], c["port"], None, *timeouts, c["path"],
                                 c["securityPolicy"], c["securityMode"],
                                 c.get("username"), c.get("passwordEnv"))
-    return ConnectionConfig(c["host"], c["port"], c["unitId"], *timeouts)
+    return ConnectionConfig(c["host"], c["port"], c["unitId"], *timeouts,
+                            max_read_registers=c.get("maxReadRegisters"),
+                            max_register_gap=c.get("maxRegisterGap"))
 
 
 def _device(d):

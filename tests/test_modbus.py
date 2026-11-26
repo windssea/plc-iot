@@ -287,5 +287,52 @@ class ModbusTests(unittest.IsolatedAsyncioTestCase):
                 await agent.close()
 
 
+class ReadPlanLimitsTest(unittest.TestCase):
+    def test_plan_reads_respects_max_read_registers_and_gap(self):
+        from plcnext_iot.config.models import ModbusAddress, PointConfig
+        from plcnext_iot.points.read_plan import plan_reads
+
+        def mk(pid, addr):
+            return PointConfig(
+                pid, pid, True, 'float32', 1000, 1, 0, None,
+                'cyclic', 1000, 0, 5000, ModbusAddress('holding_register', addr, 'CDAB'),
+            )
+
+        # Vortex flowmeter: 8 contiguous float32 points (0..15, 16 regs total), max_read_registers=14
+        vortex_pts = [mk(f'p{i}', i * 2) for i in range(8)]
+        blocks = plan_reads(vortex_pts, max_read_registers=14, max_register_gap=0)
+        self.assertEqual([(b.address, b.count) for b in blocks], [(0, 14), (14, 2)])
+
+        # Gap bridging: points at 0..1 and 6..7 (gap = 4 registers)
+        gapped = [mk('a', 0), mk('b', 6)]
+        self.assertEqual(len(plan_reads(gapped, max_read_registers=100, max_register_gap=0)), 2)
+        merged = plan_reads(gapped, max_read_registers=100, max_register_gap=4)
+        self.assertEqual([(b.address, b.count) for b in merged], [(0, 8)])
+
+    def test_config_snapshot_parses_optional_modbus_limits(self):
+        from plcnext_iot.config.models import ConfigSnapshot
+        wire = {
+            'schemaVersion': 1, 'gatewayId': 'PLC-01', 'timestamp': 1,
+            'messageId': 'cfg-1', 'configVersion': 1,
+            'config': {
+                'enabled': True,
+                'report': {'batchIntervalMs': 1000, 'maxBatchPoints': 10},
+                'devices': [{
+                    'deviceId': 'vortex-1', 'name': 'Vortex', 'enabled': True, 'protocol': 'modbus_tcp',
+                    'connection': {
+                        'host': '127.0.0.1', 'port': 502, 'unitId': 1,
+                        'connectTimeoutMs': 1000, 'requestTimeoutMs': 1000, 'retryCount': 1,
+                        'maxReadRegisters': 14, 'maxRegisterGap': 2,
+                    },
+                    'points': [],
+                }],
+            },
+        }
+        snap = ConfigSnapshot.parse(json.dumps(wire).encode(), 'PLC-01')
+        conn = snap.devices[0].connection
+        self.assertEqual(conn.max_read_registers, 14)
+        self.assertEqual(conn.max_register_gap, 2)
+
+
 if __name__ == '__main__':
     unittest.main()

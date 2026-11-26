@@ -75,7 +75,12 @@ class ModbusRunner:
                     continue
                 if context != active:
                     active = context
-                    blocks = plan_reads(context.device.points)
+                    conn = context.device.connection
+                    blocks = plan_reads(
+                        context.device.points,
+                        max_read_registers=conn.max_read_registers,
+                        max_register_gap=conn.max_register_gap,
+                    )
                     origin = loop.time()
                     deadlines = [origin] * len(blocks)
                     self.events.activate(context, {p.point_id: origin for b in blocks for p in b.points}, origin)

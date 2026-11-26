@@ -177,6 +177,16 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 10
+        },
+        "maxReadRegisters": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 125
+        },
+        "maxRegisterGap": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 124
         }
       }
     },
